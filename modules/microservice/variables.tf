@@ -14,6 +14,11 @@ variable "name" {
   description = "Name of the microservice"
 }
 
+variable "environment_name" {
+  type        = string
+  description = "Name of the environment"
+}
+
 variable "appservice" {
   type        = string
   description = "Specify appservice type if used ('plan' or 'consumption')"
@@ -69,4 +74,49 @@ variable "cosmosdb_sql_database_name" {
 variable "cosmos_autoscale_max_throughput" {
   type        = number
   description = "Max throughput of Cosmos database"
+}
+
+variable "application_insights" {
+  type = object({
+    instrumentation_key = string
+    connection_string   = string
+  })
+  description = "Application Insights to use"
+}
+
+variable "storage_accounts" {
+  type = map(object({
+    id                 = string
+    name               = string
+    primary_access_key = string
+  }))
+  description = "Storage accounts to use"
+  default     = {}
+}
+
+variable "appservice_plans" {
+  type = map(object({
+    id       = string
+    location = string
+  }))
+  description = "Appservice plans to use"
+  default     = {}
+}
+
+variable "consumption_appservice_plans" {
+  type = map(object({
+    id       = string
+    location = string
+  }))
+  description = "Consumption based appservice plans to use"
+  default     = {}
+}
+
+variable "consumption_function_appservice_plans" {
+  type = map(object({
+    id       = string
+    location = string
+  }))
+  description = "Consumption based appservice plans to use for functions"
+  default     = {}
 }

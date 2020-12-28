@@ -38,6 +38,18 @@ variable "cosmos_autoscale_max_throughput" {
   default     = 4000
 }
 
+variable "appservice_plan_tier" {
+  type        = string
+  description = "Tier of shared Appservice Plan in each region."
+  default     = "" #"Basic"
+}
+
+variable "appservice_plan_size" {
+  type        = string
+  description = "Size of shared Appservice Plan in each region."
+  default     = "" #"B1"
+}
+
 variable "microservices" {
   type = list(object({
     name       = string
@@ -111,7 +123,7 @@ variable "microservices" {
     },
     {
       name       = "service5"
-      appservice = "plan"
+      appservice = "consumption"
       function   = "plan"
       sql        = "elastic"
     }
