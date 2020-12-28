@@ -46,7 +46,15 @@ locals {
   appservice_plan_regions             = local.has_appservice_plan ? var.regions : []
   consumption_appservice_plan_regions = local.has_appservice_plan ? var.regions : []
   sql_server_regions                  = local.has_sql_server ? var.regions : []
+  sql_server_elastic_regions          = local.has_sql_server_elastic ? var.regions : []
   admin_login                         = "${var.service_name}-admin"
+
+  # if this becomes a problem can standardize envrionments to be 3 char (dev, tst, ppe, prd)
+  # 24 characters is used for max storage name
+  max_storage_name_length = 24
+  max_region_length       = reverse(sort([for region in var.regions : length(region)]))[0] # bug is preventing max() from working used sort and reverse instead
+  max_current_user_short  = local.max_storage_name_length - (length(local.service_name) + local.max_region_length + length(var.environment))
+  current_user_short      = local.max_current_user_short > 0 ? length(local.current_user) <= local.max_current_user_short ? local.current_user : substr(local.current_user, 0, local.max_current_user_short) : ""
 }
 
 #################################
@@ -151,7 +159,7 @@ resource "azurerm_cosmosdb_sql_database" "service" {
 resource "azurerm_storage_account" "service" {
   for_each = toset(var.regions)
 
-  name                     = "${var.service_name}${each.key}${var.environment}"
+  name                     = "${local.service_name}${each.key}${local.current_user_short}${var.environment}"
   resource_group_name      = azurerm_resource_group.service.name
   location                 = each.key
   account_tier             = var.storage_account_tier
@@ -182,7 +190,7 @@ resource "azurerm_key_vault_secret" "sql_admin_password" {
 resource "azurerm_mssql_server" "service" {
   for_each = toset(local.sql_server_regions)
 
-  name                         = "mssqlserver"
+  name                         = "${local.service_name}${each.key}${local.environment_name}"
   resource_group_name          = azurerm_resource_group.service.name
   location                     = each.key
   version                      = "12.0"
@@ -195,11 +203,38 @@ resource "azurerm_mssql_server" "service" {
   #     object_id      = "00000000-0000-0000-0000-000000000000"
   #   }
 
-  extended_auditing_policy {
-    storage_endpoint                        = azurerm_storage_account.service[each.key].primary_blob_endpoint
-    storage_account_access_key              = azurerm_storage_account.service[each.key].primary_access_key
-    storage_account_access_key_is_secondary = true
-    retention_in_days                       = 6
+}
+
+resource "azurerm_mssql_server_extended_auditing_policy" "service" {
+  for_each = toset(local.sql_server_regions)
+
+  server_id                               = azurerm_mssql_server.service[each.key].id
+  storage_endpoint                        = azurerm_storage_account.service[each.key].primary_blob_endpoint
+  storage_account_access_key              = azurerm_storage_account.service[each.key].primary_access_key
+  storage_account_access_key_is_secondary = false
+  retention_in_days                       = 6
+}
+
+resource "azurerm_mssql_elasticpool" "service" {
+  for_each = toset(local.sql_server_elastic_regions)
+
+  name                = "${local.service_name}-${each.key}-${local.environment_name}"
+  resource_group_name = azurerm_resource_group.service.name
+  location            = each.key
+  server_name         = azurerm_mssql_server.service[each.key].name
+  max_size_gb         = 756
+
+  # TODO: move options to input variables with default
+  sku {
+    name     = "GP_Gen5"
+    tier     = "GeneralPurpose"
+    family   = "Gen5"
+    capacity = 4
+  }
+
+  per_database_settings {
+    min_capacity = 0.25
+    max_capacity = 4
   }
 }
 
@@ -208,7 +243,7 @@ resource "azurerm_mssql_server" "service" {
 resource "azurerm_app_service_plan" "service" {
   for_each = toset(local.appservice_plan_regions)
 
-  name                = "${var.service_name}${each.key}${var.environment}"
+  name                = "${local.service_name}${each.key}${local.environment_name}"
   location            = each.key
   resource_group_name = azurerm_resource_group.service.name
   #per_site_scaling    = true
@@ -222,7 +257,7 @@ resource "azurerm_app_service_plan" "service" {
 resource "azurerm_app_service_plan" "service_consumption" {
   for_each = toset(local.consumption_appservice_plan_regions)
 
-  name                = "${var.service_name}dyn${each.key}${var.environment}"
+  name                = "${local.service_name}dyn${each.key}${local.environment_name}"
   location            = each.key
   resource_group_name = azurerm_resource_group.service.name
 
@@ -235,7 +270,7 @@ resource "azurerm_app_service_plan" "service_consumption" {
 resource "azurerm_app_service_plan" "service_consumption_function" {
   for_each = toset(local.consumption_appservice_plan_regions)
 
-  name                = "${var.service_name}dynfunc${each.key}${var.environment}"
+  name                = "${local.service_name}dynfunc${each.key}${local.environment_name}"
   location            = each.key
   resource_group_name = azurerm_resource_group.service.name
   kind                = "FunctionApp"
@@ -278,6 +313,32 @@ module "microservice" {
   consumption_function_appservice_plans = azurerm_app_service_plan.service_consumption_function
 }
 
+#### SQL Failover with all database ids from microservices
+
+resource "azurerm_sql_failover_group" "service" {
+  name                = local.service_environment_name
+  resource_group_name = azurerm_resource_group.service.name
+  server_name         = azurerm_mssql_server.service[local.primary_region].name
+  #databases           = [azurerm_sql_database.db1.id]
+
+  dynamic "partner_servers" {
+    for_each = { for server in azurerm_mssql_server.service : server.location => server if server.location != local.primary_region }
+
+    content {
+      id = partner_servers.value.id
+    }
+  }
+
+  #   partner_servers {
+  #     id = azurerm_sql_server.secondary.id
+  #   }
+
+  read_write_endpoint_failover_policy {
+    mode          = "Automatic"
+    grace_minutes = 60
+  }
+}
+
 #######################
 #### Output Values ####
 #######################
@@ -300,6 +361,8 @@ output "locals" {
     current_user             = local.current_user
     has_cosmos               = local.has_cosmos
     has_appservice_plan      = local.has_appservice_plan
+
+    max_region_length = local.max_region_length
   }
 }
 
