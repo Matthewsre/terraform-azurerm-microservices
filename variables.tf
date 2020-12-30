@@ -14,6 +14,12 @@ variable "environment" {
   }
 }
 
+variable "dev_differentiator" {
+  type        = string
+  description = "Value can be used to allow multiple dev envrionments. Logged in azure AD user mail_nickname will be used as default."
+  default     = "matt"
+}
+
 variable "enable_backups" {
   type        = bool
   description = "Enable backups for the environment"
@@ -29,7 +35,7 @@ variable "retention_in_days" {
 variable "service_name" {
   type        = string
   description = "Name of microservice"
-  default     = "terra3"
+  default     = "terra1"
 }
 
 variable "cosmos_database_name" {

@@ -37,7 +37,7 @@ locals {
   service_name                        = lower(var.service_name)
   environment_name                    = local.is_dev ? "${local.current_user}-${var.environment}" : var.environment
   service_environment_name            = local.is_dev ? "${var.service_name}-${local.current_user}-${var.environment}" : "${var.service_name}-${var.environment}"
-  current_user                        = local.is_dev && length(data.azuread_user.current_user) > 0 ? split(".", split("_", split("#EXT#", data.azuread_user.current_user[0].mail_nickname)[0])[0])[0] : ""
+  current_user                        = local.is_dev ? var.dev_differentiator != "" ? var.dev_differentiator : length(data.azuread_user.current_user) > 0 ? split(".", split("_", split("#EXT#", data.azuread_user.current_user[0].mail_nickname)[0])[0])[0] : "" : ""
   has_cosmos                          = length({ for microservice in var.microservices : microservice.name => microservice if microservice.cosmos_containers != null ? length(microservice.cosmos_containers) > 0 : false }) > 0
   has_sql_server_elastic              = length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "elastic" }) > 0
   has_sql_server                      = local.has_sql_server_elastic || length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "server" }) > 0
@@ -410,7 +410,6 @@ output "current_azurerm" {
 }
 
 output "current_user" {
-  #value = local.is_dev && length(data.azuread_user.current_user) > 0 ? data.azuread_user.current_user[0].mail_nickname : ""
   value = data.azuread_user.current_user
 }
 

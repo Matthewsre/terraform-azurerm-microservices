@@ -10,7 +10,9 @@ terraform {
 data "azurerm_subscription" "current" {}
 
 locals {
-  appservice_plans          = var.appservice == "plan" ? var.appservice_plans : {}
+  has_appservice            = var.appservice == "plan"
+  appservice_plans          = local.has_appservice ? var.appservice_plans : {}
+  has_function              = var.function == "plan" || var.function == "consumption"
   function_appservice_plans = var.function == "plan" ? var.appservice_plans : var.function == "consumption" ? var.consumption_appservice_plans : {}
   has_sql_database          = var.sql == "server" || var.sql == "elastic"
 }
@@ -130,7 +132,7 @@ resource "azurerm_app_service" "microservice" {
 }
 
 locals {
-  appservice_slots = flatten([for slot in var.appservice_deployment_slots : [for appservice in azurerm_app_service.microservice : { slot = slot, appservice = appservice }]])
+  appservice_slots = local.has_appservice ? flatten([for slot in var.appservice_deployment_slots : [for appservice in azurerm_app_service.microservice : { slot = slot, appservice = appservice }]]) : []
 }
 
 resource "azurerm_app_service_slot" "microservice" {
@@ -182,34 +184,78 @@ resource "azurerm_function_app" "microservice" {
 }
 
 locals {
-  #function_slots = flatten([for slot in var.appservice_deployment_slots : [for appservice in azurerm_function_app.microservice : { slot = slot, appservice = appservice }]])
-  function_slots = flatten([for slot in var.appservice_deployment_slots : [for appservice in local.function_appservice_plans : { slot = slot, appservice = appservice }]])
-  #function_slots  = flatten([for slot in var.appservice_deployment_slots : [for function in azurerm_function_app.microservice : { slot = slot, function = function }]])
-  #function_slots_map = { for slot in local.function_slots : "${slot.slot}-${uuid()}" => slot }
+  function_slots = local.has_function ? flatten([for slot in var.appservice_deployment_slots : [for appservice in local.function_appservice_plans : { slot = slot, appservice = appservice }]]) : []
+  function_slots_map = { for slot in local.function_slots : "${slot.slot}-${slot.appservice.location}" =>
+    {
+      slot_name         = "${azurerm_function_app.microservice[slot.appservice.location].name}-${slot.slot}"
+      function_app_name = azurerm_function_app.microservice[slot.appservice.location].name
+      location          = slot.appservice.location
+      app_service_id    = slot.appservice.id
+    }
+  }
 }
 
 resource "azurerm_function_app_slot" "microservice" {
-  #for_each = { for slot in local.function_slots : "${slot.slot}-${uuid()}" => slot }
-  for_each = { for slot in local.function_slots : "${slot.slot}-${slot.appservice.location}" => slot }
+  for_each = local.function_slots_map
 
-  name                       = "${azurerm_function_app.microservice[each.value.appservice.location].name}-${each.value.slot}"
-  function_app_name          = azurerm_function_app.microservice[each.value.appservice.location].name
-  location                   = each.value.appservice.location
+  name                       = each.value.slot_name
+  function_app_name          = each.value.function_app_name
+  location                   = each.value.location
   resource_group_name        = var.resource_group_name
-  app_service_plan_id        = each.value.appservice.id
-  storage_account_name       = var.storage_accounts[each.value.appservice.location].name
-  storage_account_access_key = var.storage_accounts[each.value.appservice.location].primary_access_key
+  app_service_plan_id        = each.value.app_service_id
+  storage_account_name       = var.storage_accounts[each.value.location].name
+  storage_account_access_key = var.storage_accounts[each.value.location].primary_access_key
 
-  app_settings = azurerm_function_app.microservice[each.value.appservice.location].app_settings
+  app_settings = azurerm_function_app.microservice[each.value.location].app_settings
 
   site_config {
-    http2_enabled      = azurerm_function_app.microservice[each.value.appservice.location].site_config[0].http2_enabled
-    websockets_enabled = azurerm_function_app.microservice[each.value.appservice.location].site_config[0].websockets_enabled
-    always_on          = azurerm_function_app.microservice[each.value.appservice.location].site_config[0].always_on
+    http2_enabled      = azurerm_function_app.microservice[each.value.location].site_config[0].http2_enabled
+    websockets_enabled = azurerm_function_app.microservice[each.value.location].site_config[0].websockets_enabled
+    always_on          = azurerm_function_app.microservice[each.value.location].site_config[0].always_on
   }
 }
 
 ### Traffic Manager
+
+resource "azurerm_traffic_manager_profile" "microservice" {
+  name                   = "${var.name}-${var.environment_name}"
+  resource_group_name    = var.resource_group_name
+  traffic_routing_method = "Performance"
+
+  dns_config {
+    relative_name = "${var.name}-${var.environment_name}"
+    ttl           = 60
+  }
+
+  monitor_config {
+    protocol                     = "https"
+    port                         = 443
+    path                         = "/"
+    interval_in_seconds          = 30
+    timeout_in_seconds           = 10
+    tolerated_number_of_failures = 3
+  }
+}
+
+locals {
+  endpoints = local.has_appservice ? azurerm_app_service.microservice : {}
+}
+
+resource "azurerm_traffic_manager_endpoint" "microservice" {
+  for_each = local.endpoints
+
+  name                = each.value.location
+  resource_group_name = var.resource_group_name
+  profile_name        = azurerm_traffic_manager_profile.microservice.name
+  type                = "azureEndpoints"
+  target_resource_id  = each.value.id
+
+  # traffic manager can cause conflict errors if running in parallel with slot creation
+  depends_on = [
+    azurerm_app_service_slot.microservice,
+    azurerm_function_app_slot.microservice
+  ]
+}
 
 #######################
 #### Output Values ####
