@@ -14,6 +14,21 @@ variable "name" {
   description = "Name of the microservice"
 }
 
+variable "primary_region" {
+  type        = string
+  description = "Primary region used for shared resources. If not provided will use first value from 'regions'"
+}
+
+variable "secondary_region" {
+  type        = string
+  description = "Secondary region used for shared resources. If not provided will use second value from 'regions'"
+}
+
+variable "retention_in_days" {
+  type        = number
+  description = "Days set for retention policies"
+}
+
 variable "environment_name" {
   type        = string
   description = "Name of the environment"
@@ -24,9 +39,14 @@ variable "appservice" {
   description = "Specify appservice type if used ('plan' or 'consumption')"
   default     = ""
   validation {
-    condition     = var.appservice == null ? true : contains(["", "plan", "consumption"], lower(var.appservice))
-    error_message = "Value must be '', 'plan', or 'consumption'."
+    condition     = var.appservice == null ? true : contains(["", "plan"], lower(var.appservice))
+    error_message = "Value must be '' or 'plan'."
   }
+}
+
+variable "appservice_deployment_slots" {
+  description = "Additional deployment slots for app services. Standard and above plans allow for deployment slot."
+  type        = list(string)
 }
 
 variable "function" {
@@ -47,6 +67,18 @@ variable "sql" {
     condition     = var.sql == null ? true : contains(["", "server", "elastic"], lower(var.sql))
     error_message = "Value must be '', 'server', or 'elastic'."
   }
+}
+
+variable "sql_server_id" {
+  type        = string
+  description = "Server Id for SQL"
+  default     = ""
+}
+
+variable "sql_elastic_pool_id" {
+  type        = string
+  description = "Elastic pool Id for SQL"
+  default     = ""
 }
 
 variable "cosmos_containers" {
@@ -86,11 +118,13 @@ variable "application_insights" {
 
 variable "storage_accounts" {
   type = map(object({
-    id                 = string
-    name               = string
-    primary_access_key = string
+    id                    = string
+    name                  = string
+    primary_blob_endpoint = string
+    primary_access_key    = string
   }))
   description = "Storage accounts to use"
+  sensitive   = true
   default     = {}
 }
 
@@ -109,14 +143,5 @@ variable "consumption_appservice_plans" {
     location = string
   }))
   description = "Consumption based appservice plans to use"
-  default     = {}
-}
-
-variable "consumption_function_appservice_plans" {
-  type = map(object({
-    id       = string
-    location = string
-  }))
-  description = "Consumption based appservice plans to use for functions"
   default     = {}
 }

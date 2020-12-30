@@ -10,15 +10,50 @@ terraform {
 data "azurerm_subscription" "current" {}
 
 locals {
-  appservice_plans          = var.appservice == "plan" ? var.appservice_plans : var.appservice == "consumption" ? var.consumption_appservice_plans : {}
-  function_appservice_plans = var.function == "plan" ? var.appservice_plans : var.function == "consumption" ? var.consumption_function_appservice_plans : {}
+  appservice_plans          = var.appservice == "plan" ? var.appservice_plans : {}
+  function_appservice_plans = var.function == "plan" ? var.appservice_plans : var.function == "consumption" ? var.consumption_appservice_plans : {}
+  has_sql_database          = var.sql == "server" || var.sql == "elastic"
 }
 
-#############################
-#### Datastore Resources ####
-#############################
+################################
+#### Microservice Resources ####
+################################
 
 ### Create UserAssigned MSI for resources (KeyVault, Sql, Cosmos, ServiceBus)
+
+### SQL Database
+
+resource "azurerm_mssql_database" "microservice" {
+  count = local.has_sql_database ? 1 : 0
+
+  name            = "${var.name}-${var.environment_name}"
+  server_id       = var.sql_server_id
+  elastic_pool_id = var.sql == "elastic" ? var.sql_elastic_pool_id : null
+  collation       = "SQL_Latin1_General_CP1_CI_AS"
+  license_type    = "LicenseIncluded"
+  sku_name        = var.sql == "elastic" ? "ElasticPool" : "BC_Gen5_2"
+
+  #max_size_gb     = 4
+  #read_scale      = true
+
+  extended_auditing_policy {
+    storage_endpoint                        = var.storage_accounts[var.primary_region].primary_blob_endpoint
+    storage_account_access_key              = var.storage_accounts[var.primary_region].primary_access_key
+    storage_account_access_key_is_secondary = false
+    retention_in_days                       = var.retention_in_days
+  }
+}
+
+#Commenting this out and moving it to azurerm_mssql_database to avoid identity configuration issue from being created separately
+# resource "azurerm_mssql_database_extended_auditing_policy" "example" {
+#   count = local.has_sql_database ? 1 : 0
+
+#   database_id                             = azurerm_mssql_database.microservice[0].id
+#   storage_endpoint                        = var.storage_accounts[var.primary_region].primary_blob_endpoint
+#   storage_account_access_key              = var.storage_accounts[var.primary_region].primary_access_key
+#   storage_account_access_key_is_secondary = false
+#   retention_in_days                       = var.retention_in_days
+# }
 
 ### Cosmos DB
 
@@ -41,6 +76,21 @@ resource "azurerm_cosmosdb_sql_container" "microservice" {
 
 ### Appservice
 
+locals {
+  appservice_app_settings = {
+    "APPINSIGHTS_INSTRUMENTATIONKEY"             = var.application_insights.instrumentation_key
+    "APPLICATIONINSIGHTS_CONNECTION_STRING"      = var.application_insights.connection_string
+    "ApplicationInsightsAgent_EXTENSION_VERSION" = "~2",
+    "AzureAd:TenantId"                           = data.azurerm_subscription.current.tenant_id
+  }
+}
+
+locals {
+  appservice_function_app_settings = {
+    "FUNCTIONS_WORKER_RUNTIME" = "dotnet",
+  }
+}
+
 resource "azurerm_app_service" "microservice" {
   for_each = local.appservice_plans
 
@@ -59,13 +109,15 @@ resource "azurerm_app_service" "microservice" {
     #websockets_enabled = true # Will need for Blazor hosted appservice
   }
 
-  app_settings = {
-    "APPINSIGHTS_INSTRUMENTATIONKEY"             = var.application_insights.instrumentation_key
-    "APPLICATIONINSIGHTS_CONNECTION_STRING"      = var.application_insights.connection_string
-    "ApplicationInsightsAgent_EXTENSION_VERSION" = "~2",
-    "FUNCTIONS_WORKER_RUNTIME"                   = "dotnet",
-    "AzureAd:TenantId"                           = data.azurerm_subscription.current.tenant_id
-  }
+  app_settings = local.appservice_app_settings
+
+  #   app_settings = {
+  #     "APPINSIGHTS_INSTRUMENTATIONKEY"             = var.application_insights.instrumentation_key
+  #     "APPLICATIONINSIGHTS_CONNECTION_STRING"      = var.application_insights.connection_string
+  #     "ApplicationInsightsAgent_EXTENSION_VERSION" = "~2",
+  #     "FUNCTIONS_WORKER_RUNTIME"                   = "dotnet",
+  #     "AzureAd:TenantId"                           = data.azurerm_subscription.current.tenant_id
+  #   }
 
   #   storage_account {
   #     name       = var.storage_accounts[each.value.location].name
@@ -74,6 +126,29 @@ resource "azurerm_app_service" "microservice" {
 
   identity {
     type = "SystemAssigned"
+  }
+}
+
+locals {
+  appservice_slots = flatten([for slot in var.appservice_deployment_slots : [for appservice in azurerm_app_service.microservice : { slot = slot, appservice = appservice }]])
+}
+
+resource "azurerm_app_service_slot" "microservice" {
+  for_each = { for slot in local.appservice_slots : "${slot.slot}-${slot.appservice.name}" => slot }
+
+  name                = "${each.value.appservice.name}-${each.value.slot}"
+  app_service_name    = each.value.appservice.name
+  location            = each.value.appservice.location
+  resource_group_name = var.resource_group_name
+  app_service_plan_id = each.value.appservice.app_service_plan_id
+
+  app_settings = local.appservice_app_settings
+
+  site_config {
+    dotnet_framework_version = each.value.appservice.site_config[0].dotnet_framework_version
+    http2_enabled            = each.value.appservice.site_config[0].http2_enabled
+    websockets_enabled       = each.value.appservice.site_config[0].websockets_enabled
+    always_on                = each.value.appservice.site_config[0].always_on
   }
 }
 
@@ -94,13 +169,19 @@ resource "azurerm_function_app" "microservice" {
 
   site_config {
     http2_enabled   = true
-    always_on       = true
+    always_on       = var.function == "plan" ? true : false
     ftps_state      = "FtpsOnly"
     min_tls_version = "1.2"
     #dotnet_framework_version = "v5.0"
   }
 
-  #app_settings = local.application_settings
+  app_settings = {
+    "APPINSIGHTS_INSTRUMENTATIONKEY"             = var.application_insights.instrumentation_key
+    "APPLICATIONINSIGHTS_CONNECTION_STRING"      = var.application_insights.connection_string
+    "ApplicationInsightsAgent_EXTENSION_VERSION" = "~2",
+    "FUNCTIONS_WORKER_RUNTIME"                   = "dotnet",
+    "AzureAd:TenantId"                           = data.azurerm_subscription.current.tenant_id
+  }
 
   identity {
     type = "SystemAssigned"
@@ -113,10 +194,14 @@ resource "azurerm_function_app" "microservice" {
 #### Output Values ####
 #######################
 
-output "microservices_module" {
+output "name" {
   value = var.name
 }
 
-output "azurerm_app_service_microservice" {
-  value = azurerm_app_service.microservice
+output "database_id" {
+  value = local.has_sql_database ? azurerm_mssql_database.microservice[0].id : null
 }
+
+# output "azurerm_app_service_microservice" {
+#   value = azurerm_app_service.microservice
+# }

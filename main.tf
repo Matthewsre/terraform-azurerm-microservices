@@ -33,7 +33,7 @@ data "azuread_user" "current_user" {
 
 locals {
   primary_region                      = var.primary_region != "" ? var.primary_region : var.regions[0]
-  retention_in_days                   = 90
+  secondary_region                    = var.secondary_region != "" ? var.secondary_region : length(var.regions) > 1 ? var.regions[1] : null
   service_name                        = lower(var.service_name)
   environment_name                    = local.is_dev ? "${local.current_user}-${var.environment}" : var.environment
   service_environment_name            = local.is_dev ? "${var.service_name}-${local.current_user}-${var.environment}" : "${var.service_name}-${var.environment}"
@@ -42,11 +42,11 @@ locals {
   has_sql_server_elastic              = length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "elastic" }) > 0
   has_sql_server                      = local.has_sql_server_elastic || length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "server" }) > 0
   has_appservice_plan                 = length({ for microservice in var.microservices : microservice.name => microservice if microservice.appservice == "plan" || microservice.function == "plan" }) > 0
-  has_consumption_appservice_plan     = length({ for microservice in var.microservices : microservice.name => microservice if microservice.appservice == "consumption" || microservice.function == "consumption" }) > 0
+  has_consumption_appservice_plan     = length({ for microservice in var.microservices : microservice.name => microservice if microservice.function == "consumption" }) > 0
   appservice_plan_regions             = local.has_appservice_plan ? var.regions : []
-  consumption_appservice_plan_regions = local.has_appservice_plan ? var.regions : []
-  sql_server_regions                  = local.has_sql_server ? var.regions : []
-  sql_server_elastic_regions          = local.has_sql_server_elastic ? var.regions : []
+  consumption_appservice_plan_regions = local.has_consumption_appservice_plan ? var.regions : []
+  sql_server_regions                  = local.has_sql_server ? local.secondary_region != null ? [local.primary_region, local.secondary_region] : [local.primary_region] : []
+  sql_server_elastic_regions          = local.has_sql_server_elastic ? local.sql_server_regions : []
   admin_login                         = "${var.service_name}-admin"
 
   # if this becomes a problem can standardize envrionments to be 3 char (dev, tst, ppe, prd)
@@ -55,6 +55,20 @@ locals {
   max_region_length       = reverse(sort([for region in var.regions : length(region)]))[0] # bug is preventing max() from working used sort and reverse instead
   max_current_user_short  = local.max_storage_name_length - (length(local.service_name) + local.max_region_length + length(var.environment))
   current_user_short      = local.max_current_user_short > 0 ? length(local.current_user) <= local.max_current_user_short ? local.current_user : substr(local.current_user, 0, local.max_current_user_short) : ""
+}
+
+# Getting current IP Address, only used for dev environment
+# solution from here: https://stackoverflow.com/a/58959164/1362146
+data "http" "my_public_ip" {
+  url = "https://ifconfig.co/json"
+  request_headers = {
+    Accept = "application/json"
+  }
+}
+
+locals {
+  http_my_public_ip_response = jsondecode(data.http.my_public_ip.body)
+  current_ip                 = local.is_dev ? local.http_my_public_ip_response.ip : null
 }
 
 #################################
@@ -71,7 +85,7 @@ resource "azurerm_application_insights" "service" {
   name                = local.service_environment_name
   location            = local.primary_region
   resource_group_name = azurerm_resource_group.service.name
-  retention_in_days   = local.retention_in_days
+  retention_in_days   = var.retention_in_days
   application_type    = "web"
 
 
@@ -83,36 +97,6 @@ resource "azurerm_application_insights" "service" {
   #     "hidden-link:/subscriptions/${data.azurerm_subscription.current.subscription_id}/resourceGroups/${azurerm_resource_group.service.name}/providers/Microsoft.Web/sites/${local.function_app_name}" = "Resource"
   #   }
 
-}
-
-resource "azurerm_key_vault" "service" {
-  name                        = local.service_environment_name
-  location                    = local.primary_region
-  resource_group_name         = azurerm_resource_group.service.name
-  enabled_for_disk_encryption = true
-  tenant_id                   = data.azurerm_client_config.current.tenant_id
-  soft_delete_enabled         = true
-  soft_delete_retention_days  = 7
-  purge_protection_enabled    = false
-  sku_name                    = "standard"
-
-  access_policy {
-    tenant_id = data.azurerm_client_config.current.tenant_id
-    object_id = data.azurerm_client_config.current.object_id
-
-    secret_permissions = [
-      "set",
-      "get",
-      "delete",
-      "purge",
-      "recover"
-    ]
-  }
-
-  network_acls {
-    default_action = "Deny"
-    bypass         = "AzureServices"
-  }
 }
 
 resource "azurerm_cosmosdb_account" "service" {
@@ -136,7 +120,7 @@ resource "azurerm_cosmosdb_account" "service" {
 
     content {
       location          = geo_location.value
-      failover_priority = geo_location.value == local.primary_region ? 0 : 1
+      failover_priority = index(var.regions, geo_location.value) # geo_location.value == local.primary_region ? 0 : 1
     }
   }
 }
@@ -149,6 +133,89 @@ resource "azurerm_cosmosdb_sql_database" "service" {
 
   autoscale_settings {
     max_throughput = var.cosmos_autoscale_max_throughput
+  }
+}
+
+resource "azurerm_key_vault" "service" {
+  name                        = local.service_environment_name
+  location                    = local.primary_region
+  resource_group_name         = azurerm_resource_group.service.name
+  enabled_for_disk_encryption = true
+  tenant_id                   = data.azurerm_client_config.current.tenant_id
+  soft_delete_enabled         = true
+  soft_delete_retention_days  = var.retention_in_days
+  purge_protection_enabled    = false
+  sku_name                    = "standard"
+
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azurerm_client_config.current.object_id
+
+    certificate_permissions = [
+      "backup",
+      "create",
+      "delete",
+      "deleteissuers",
+      "get",
+      "getissuers",
+      "import",
+      "list",
+      "listissuers",
+      "managecontacts",
+      "manageissuers",
+      "purge",
+      "recover",
+      "restore",
+      "setissuers",
+      "update"
+    ]
+
+    key_permissions = [
+      "backup",
+      "create",
+      "decrypt",
+      "delete",
+      "encrypt",
+      "get",
+      "import",
+      "list",
+      "purge",
+      "recover",
+      "restore",
+      "sign",
+      "unwrapKey",
+      "update",
+      "verify",
+      "wrapKey"
+    ]
+
+    secret_permissions = [
+      "backup",
+      "delete",
+      "get",
+      "list",
+      "purge",
+      "recover",
+      "restore",
+      "set"
+    ]
+
+    storage_permissions = [
+      "backup",
+      "delete",
+      "get",
+      "list",
+      "purge",
+      "recover",
+      "restore",
+      "set"
+    ]
+  }
+
+  network_acls {
+    default_action = "Deny"
+    bypass         = "AzureServices"
+    ip_rules       = local.is_dev ? [local.current_ip] : null
   }
 }
 
@@ -212,13 +279,13 @@ resource "azurerm_mssql_server_extended_auditing_policy" "service" {
   storage_endpoint                        = azurerm_storage_account.service[each.key].primary_blob_endpoint
   storage_account_access_key              = azurerm_storage_account.service[each.key].primary_access_key
   storage_account_access_key_is_secondary = false
-  retention_in_days                       = 6
+  retention_in_days                       = var.retention_in_days
 }
 
 resource "azurerm_mssql_elasticpool" "service" {
   for_each = toset(local.sql_server_elastic_regions)
 
-  name                = "${local.service_name}-${each.key}-${local.environment_name}"
+  name                = "${local.service_name}-${local.environment_name}"
   resource_group_name = azurerm_resource_group.service.name
   location            = each.key
   server_name         = azurerm_mssql_server.service[each.key].name
@@ -260,19 +327,6 @@ resource "azurerm_app_service_plan" "service_consumption" {
   name                = "${local.service_name}dyn${each.key}${local.environment_name}"
   location            = each.key
   resource_group_name = azurerm_resource_group.service.name
-
-  sku {
-    tier = "Dynamic"
-    size = "Y1"
-  }
-}
-
-resource "azurerm_app_service_plan" "service_consumption_function" {
-  for_each = toset(local.consumption_appservice_plan_regions)
-
-  name                = "${local.service_name}dynfunc${each.key}${local.environment_name}"
-  location            = each.key
-  resource_group_name = azurerm_resource_group.service.name
   kind                = "FunctionApp"
 
   sku {
@@ -301,25 +355,33 @@ module "microservice" {
   #     max_throughput     = container.max_throughput
   #   }]
 
-  resource_group_name                   = azurerm_resource_group.service.name
-  environment_name                      = local.environment_name
-  application_insights                  = azurerm_application_insights.service
-  storage_accounts                      = azurerm_storage_account.service
-  cosmosdb_account_name                 = local.has_cosmos ? azurerm_cosmosdb_account.service[0].name : null
-  cosmosdb_sql_database_name            = local.has_cosmos ? azurerm_cosmosdb_sql_database.service[0].name : null
-  cosmos_autoscale_max_throughput       = var.cosmos_autoscale_max_throughput
-  appservice_plans                      = azurerm_app_service_plan.service
-  consumption_appservice_plans          = azurerm_app_service_plan.service_consumption
-  consumption_function_appservice_plans = azurerm_app_service_plan.service_consumption_function
+  resource_group_name             = azurerm_resource_group.service.name
+  retention_in_days               = var.retention_in_days
+  primary_region                  = local.primary_region
+  secondary_region                = local.secondary_region
+  environment_name                = local.environment_name
+  application_insights            = azurerm_application_insights.service
+  storage_accounts                = azurerm_storage_account.service
+  sql_server_id                   = azurerm_mssql_server.service[local.primary_region].id
+  sql_elastic_pool_id             = azurerm_mssql_elasticpool.service[local.primary_region].id
+  cosmosdb_account_name           = local.has_cosmos ? azurerm_cosmosdb_account.service[0].name : null
+  cosmosdb_sql_database_name      = local.has_cosmos ? azurerm_cosmosdb_sql_database.service[0].name : null
+  cosmos_autoscale_max_throughput = var.cosmos_autoscale_max_throughput
+  appservice_plans                = azurerm_app_service_plan.service
+  appservice_deployment_slots     = var.appservice_deployment_slots
+  consumption_appservice_plans    = azurerm_app_service_plan.service_consumption
 }
 
 #### SQL Failover with all database ids from microservices
 
 resource "azurerm_sql_failover_group" "service" {
+  count = local.has_sql_server && length(var.regions) > 1 ? 1 : 0
+
   name                = local.service_environment_name
   resource_group_name = azurerm_resource_group.service.name
   server_name         = azurerm_mssql_server.service[local.primary_region].name
-  #databases           = [azurerm_sql_database.db1.id]
+
+  databases = [for service in module.microservice : service.database_id if service.database_id != null]
 
   dynamic "partner_servers" {
     for_each = { for server in azurerm_mssql_server.service : server.location => server if server.location != local.primary_region }

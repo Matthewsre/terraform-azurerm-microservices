@@ -20,10 +20,16 @@ variable "enable_backups" {
   default     = false
 }
 
+variable "retention_in_days" {
+  type        = number
+  description = "Global retention policy set. (SQL Server, Application Insights, KeyVault Soft Delete, SQL Database)"
+  default     = 90
+}
+
 variable "service_name" {
   type        = string
   description = "Name of microservice"
-  default     = "myservice"
+  default     = "terra2"
 }
 
 variable "cosmos_database_name" {
@@ -38,16 +44,22 @@ variable "cosmos_autoscale_max_throughput" {
   default     = 4000
 }
 
+variable "appservice_deployment_slots" {
+  description = "Additional deployment slots for app services. Standard and above plans allow for deployment slot."
+  type        = list(string)
+  default     = ["staging"]
+}
+
 variable "appservice_plan_tier" {
   type        = string
   description = "Tier of shared Appservice Plan in each region."
-  default     = "" #"Basic"
+  default     = "Standard" #"Basic"
 }
 
 variable "appservice_plan_size" {
   type        = string
   description = "Size of shared Appservice Plan in each region."
-  default     = "" #"B1"
+  default     = "S1" #"B1"
 }
 
 variable "microservices" {
@@ -64,75 +76,48 @@ variable "microservices" {
     })))
   }))
   default = [
+
     {
-      name       = "service1"
+      name       = "cosm1"
       appservice = "plan"
       function   = "plan"
       sql        = "elastic"
       cosmos_containers = [
         {
-          name               = "service1countainer1"
+          name               = "container1"
           partition_key_path = "/PartitionKey"
           max_throughput     = 0
         },
         {
-          name               = "service1countainer2"
-          partition_key_path = "/PartitionKey"
-          max_throughput     = 0
-        },
-        {
-          name               = "service1countainer3"
-          partition_key_path = "/PartitionKey"
-          max_throughput     = 0
-        },
-        {
-          name               = "service1countainer4"
-          partition_key_path = "/PartitionKey"
-          max_throughput     = 0
-        },
-        {
-          name               = "service1countainer5"
+          name               = "container2"
           partition_key_path = "/PartitionKey"
           max_throughput     = 0
         }
       ]
     },
     {
-      name       = "service2"
+      name       = "confun"
       appservice = "plan"
       function   = "consumption"
       sql        = "elastic"
     },
     {
-      name       = "service3"
+      name       = "basic"
       appservice = "plan"
+      function   = "plan"
       sql        = "elastic"
     },
     {
-      name       = "service4"
+      name       = "cosm2"
       appservice = "plan"
-      function   = "consumption"
-      sql        = "elastic"
       cosmos_containers = [
         {
-          name               = "service4countainer1"
+          name               = "container3"
           partition_key_path = "/PartitionKey"
           max_throughput     = 0
         }
       ]
-    },
-    {
-      name       = "service5"
-      appservice = "consumption"
-      function   = "plan"
-      sql        = "elastic"
     }
-    # ,
-    # {
-    #   name    = "service6"
-    #   hosting = ["virtualmachine"]
-    #   storage = ["cosmos", "azuresql"]
-    # }
   ]
 }
 
@@ -142,10 +127,16 @@ variable "primary_region" {
   default     = ""
 }
 
+variable "secondary_region" {
+  type        = string
+  description = "Secondary region used for shared resources. If not provided will use second value from 'regions'"
+  default     = ""
+}
+
 variable "regions" {
   type        = list(string)
   description = "Azure regions the service is located in"
-  default     = ["westus2", "eastus"]
+  default     = ["westus2", "eastus", "eastus2"]
   validation {
     condition     = length(var.regions) > 0
     error_message = "Must provide at least 1 region to deploy."
