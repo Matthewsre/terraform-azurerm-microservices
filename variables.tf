@@ -29,7 +29,7 @@ variable "retention_in_days" {
 variable "service_name" {
   type        = string
   description = "Name of microservice"
-  default     = "terra2"
+  default     = "terra3"
 }
 
 variable "cosmos_database_name" {

@@ -182,28 +182,30 @@ resource "azurerm_function_app" "microservice" {
 }
 
 locals {
-  function_slots = flatten([for slot in var.appservice_deployment_slots : [for appservice in azurerm_function_app.microservice : { slot = slot, appservice = appservice }]])
+  #function_slots = flatten([for slot in var.appservice_deployment_slots : [for appservice in azurerm_function_app.microservice : { slot = slot, appservice = appservice }]])
+  function_slots = flatten([for slot in var.appservice_deployment_slots : [for appservice in local.function_appservice_plans : { slot = slot, appservice = appservice }]])
   #function_slots  = flatten([for slot in var.appservice_deployment_slots : [for function in azurerm_function_app.microservice : { slot = slot, function = function }]])
   #function_slots_map = { for slot in local.function_slots : "${slot.slot}-${uuid()}" => slot }
 }
 
 resource "azurerm_function_app_slot" "microservice" {
-  for_each = { for slot in local.function_slots : "${slot.slot}-${uuid()}" => slot }
+  #for_each = { for slot in local.function_slots : "${slot.slot}-${uuid()}" => slot }
+  for_each = { for slot in local.function_slots : "${slot.slot}-${slot.appservice.location}" => slot }
 
-  name                       = "${each.value.appservice.name}-${each.value.slot}"
-  function_app_name          = each.value.appservice.name
+  name                       = "${azurerm_function_app.microservice[each.value.appservice.location].name}-${each.value.slot}"
+  function_app_name          = azurerm_function_app.microservice[each.value.appservice.location].name
   location                   = each.value.appservice.location
   resource_group_name        = var.resource_group_name
-  app_service_plan_id        = each.value.appservice.app_service_plan_id
+  app_service_plan_id        = each.value.appservice.id
   storage_account_name       = var.storage_accounts[each.value.appservice.location].name
   storage_account_access_key = var.storage_accounts[each.value.appservice.location].primary_access_key
 
-  app_settings = each.value.appservice.app_settings
+  app_settings = azurerm_function_app.microservice[each.value.appservice.location].app_settings
 
   site_config {
-    http2_enabled      = each.value.appservice.site_config[0].http2_enabled
-    websockets_enabled = each.value.appservice.site_config[0].websockets_enabled
-    always_on          = each.value.appservice.site_config[0].always_on
+    http2_enabled      = azurerm_function_app.microservice[each.value.appservice.location].site_config[0].http2_enabled
+    websockets_enabled = azurerm_function_app.microservice[each.value.appservice.location].site_config[0].websockets_enabled
+    always_on          = azurerm_function_app.microservice[each.value.appservice.location].site_config[0].always_on
   }
 }
 
