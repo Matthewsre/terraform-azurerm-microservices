@@ -117,6 +117,18 @@ variable "microservices" {
           max_throughput     = 0
         }
       ]
+    },
+    {
+      name     = "funp"
+      function = "plan"
+    },
+    {
+      name     = "func"
+      function = "consumption"
+    },
+    {
+      name       = "apponly"
+      appservice = "plan"
     }
   ]
 }
@@ -136,7 +148,7 @@ variable "secondary_region" {
 variable "regions" {
   type        = list(string)
   description = "Azure regions the service is located in"
-  default     = ["westus2", "eastus", "eastus2"]
+  default     = ["westus2", "eastus"]
   validation {
     condition     = length(var.regions) > 0
     error_message = "Must provide at least 1 region to deploy."

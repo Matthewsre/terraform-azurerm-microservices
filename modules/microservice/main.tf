@@ -142,7 +142,7 @@ resource "azurerm_app_service_slot" "microservice" {
   resource_group_name = var.resource_group_name
   app_service_plan_id = each.value.appservice.app_service_plan_id
 
-  app_settings = local.appservice_app_settings
+  app_settings = each.value.appservice.app_settings
 
   site_config {
     dotnet_framework_version = each.value.appservice.site_config[0].dotnet_framework_version
@@ -172,19 +172,38 @@ resource "azurerm_function_app" "microservice" {
     always_on       = var.function == "plan" ? true : false
     ftps_state      = "FtpsOnly"
     min_tls_version = "1.2"
-    #dotnet_framework_version = "v5.0"
   }
 
-  app_settings = {
-    "APPINSIGHTS_INSTRUMENTATIONKEY"             = var.application_insights.instrumentation_key
-    "APPLICATIONINSIGHTS_CONNECTION_STRING"      = var.application_insights.connection_string
-    "ApplicationInsightsAgent_EXTENSION_VERSION" = "~2",
-    "FUNCTIONS_WORKER_RUNTIME"                   = "dotnet",
-    "AzureAd:TenantId"                           = data.azurerm_subscription.current.tenant_id
-  }
+  app_settings = merge(local.appservice_app_settings, local.appservice_function_app_settings)
 
   identity {
     type = "SystemAssigned"
+  }
+}
+
+locals {
+  function_slots = flatten([for slot in var.appservice_deployment_slots : [for appservice in azurerm_function_app.microservice : { slot = slot, appservice = appservice }]])
+  #function_slots  = flatten([for slot in var.appservice_deployment_slots : [for function in azurerm_function_app.microservice : { slot = slot, function = function }]])
+  #function_slots_map = { for slot in local.function_slots : "${slot.slot}-${uuid()}" => slot }
+}
+
+resource "azurerm_function_app_slot" "microservice" {
+  for_each = { for slot in local.function_slots : "${slot.slot}-${uuid()}" => slot }
+
+  name                       = "${each.value.appservice.name}-${each.value.slot}"
+  function_app_name          = each.value.appservice.name
+  location                   = each.value.appservice.location
+  resource_group_name        = var.resource_group_name
+  app_service_plan_id        = each.value.appservice.app_service_plan_id
+  storage_account_name       = var.storage_accounts[each.value.appservice.location].name
+  storage_account_access_key = var.storage_accounts[each.value.appservice.location].primary_access_key
+
+  app_settings = each.value.appservice.app_settings
+
+  site_config {
+    http2_enabled      = each.value.appservice.site_config[0].http2_enabled
+    websockets_enabled = each.value.appservice.site_config[0].websockets_enabled
+    always_on          = each.value.appservice.site_config[0].always_on
   }
 }
 
