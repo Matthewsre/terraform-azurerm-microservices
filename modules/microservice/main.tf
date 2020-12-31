@@ -310,7 +310,7 @@ resource "azurerm_function_app" "microservice" {
 }
 
 locals {
-  function_slots = local.has_function ? flatten([for slot in var.appservice_deployment_slots : [for appservice in local.function_appservice_plans : { slot = slot, appservice = appservice }]]) : []
+  function_slots = local.has_function && length(var.appservice_deployment_slots) > 0 ? flatten([for slot in var.appservice_deployment_slots : [for appservice in local.function_appservice_plans : { slot = slot, appservice = appservice }]]) : []
   function_slots_map = { for slot in local.function_slots : "${slot.slot}-${slot.appservice.location}" =>
     {
       slot_name         = "${azurerm_function_app.microservice[slot.appservice.location].name}-${slot.slot}"

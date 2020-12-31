@@ -1,5 +1,5 @@
 module "microservice" {
-  source = "../../"
+  source = "Matthewsre/microservices/azurerm"
 
   service_name = "myservice"
   regions      = ["westus2"]
