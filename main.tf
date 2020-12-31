@@ -35,9 +35,9 @@ locals {
   primary_region                      = var.primary_region != "" ? var.primary_region : var.regions[0]
   secondary_region                    = var.secondary_region != "" ? var.secondary_region : length(var.regions) > 1 ? var.regions[1] : null
   service_name                        = lower(var.service_name)
-  environment_name                    = local.is_dev ? "${local.current_user}-${var.environment}" : var.environment
-  service_environment_name            = local.is_dev ? "${var.service_name}-${local.current_user}-${var.environment}" : "${var.service_name}-${var.environment}"
-  current_user                        = local.is_dev ? var.dev_differentiator != "" ? var.dev_differentiator : length(data.azuread_user.current_user) > 0 ? split(".", split("_", split("#EXT#", data.azuread_user.current_user[0].mail_nickname)[0])[0])[0] : "" : ""
+  environment_name                    = local.is_dev ? "${local.environment_differentiator}-${var.environment}" : var.environment
+  service_environment_name            = local.is_dev ? "${var.service_name}-${local.environment_differentiator}-${var.environment}" : "${var.service_name}-${var.environment}"
+  environment_differentiator          = var.environment_differentiator != "" ? var.environment_differentiator : local.is_dev && length(data.azuread_user.current_user) > 0 ? split(".", split("_", split("#EXT#", data.azuread_user.current_user[0].mail_nickname)[0])[0])[0] : ""
   has_cosmos                          = length({ for microservice in var.microservices : microservice.name => microservice if microservice.cosmos_containers != null ? length(microservice.cosmos_containers) > 0 : false }) > 0
   has_sql_server_elastic              = length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "elastic" }) > 0
   has_sql_server                      = local.has_sql_server_elastic || length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "server" }) > 0
@@ -51,15 +51,17 @@ locals {
 
   # if this becomes a problem can standardize envrionments to be 3 char (dev, tst, ppe, prd)
   # 24 characters is used for max storage name
-  max_storage_name_length = 24
-  max_region_length       = reverse(sort([for region in var.regions : length(region)]))[0] # bug is preventing max() from working used sort and reverse instead
-  max_current_user_short  = local.max_storage_name_length - (length(local.service_name) + local.max_region_length + length(var.environment))
-  current_user_short      = local.max_current_user_short > 0 ? length(local.current_user) <= local.max_current_user_short ? local.current_user : substr(local.current_user, 0, local.max_current_user_short) : ""
+  max_storage_name_length              = 24
+  max_region_length                    = reverse(sort([for region in var.regions : length(region)]))[0] # bug is preventing max() from working used sort and reverse instead
+  max_environment_differentiator_short = local.max_storage_name_length - (length(local.service_name) + local.max_region_length + length(var.environment))
+  environment_differentiator_short     = local.max_environment_differentiator_short > 0 ? length(local.environment_differentiator) <= local.max_environment_differentiator_short ? local.environment_differentiator : substr(local.environment_differentiator, 0, local.max_environment_differentiator_short) : ""
 }
 
 # Getting current IP Address, only used for dev environment
 # solution from here: https://stackoverflow.com/a/58959164/1362146
 data "http" "my_public_ip" {
+  count = local.is_dev ? 1 : 0
+
   url = "https://ifconfig.co/json"
   request_headers = {
     Accept = "application/json"
@@ -67,8 +69,11 @@ data "http" "my_public_ip" {
 }
 
 locals {
-  http_my_public_ip_response = jsondecode(data.http.my_public_ip.body)
+  http_my_public_ip_response = jsondecode(data.http.my_public_ip[0].body)
   current_ip                 = local.is_dev ? local.http_my_public_ip_response.ip : null
+
+  # the current_ip is only retrieved and set for the dev environment to simplify developer workflow
+  key_vault_ip_rules = local.is_dev ? ["${local.current_ip}/32"] : null
 }
 
 #################################
@@ -89,7 +94,7 @@ resource "azurerm_application_insights" "service" {
   application_type    = "web"
 
 
-  # these tags will be needed to link the application insights with the azure functions 
+  # these tags might be needed to link the application insights with the azure functions (seems to be linking correctly without)
   # more details available here: https://github.com/terraform-providers/terraform-provider-azurerm/issues/1303
   # stackoverflow here: https://stackoverflow.com/questions/60175600/how-to-associate-an-azure-app-service-with-an-application-insights-resource-new
   #
@@ -100,16 +105,12 @@ resource "azurerm_application_insights" "service" {
 }
 
 resource "azurerm_cosmosdb_account" "service" {
-  count               = local.has_cosmos ? 1 : 0
-  name                = local.service_environment_name
-  resource_group_name = azurerm_resource_group.service.name
-  location            = local.primary_region
-  offer_type          = "Standard"
-  # todo: multi-region flag?
+  count                     = local.has_cosmos ? 1 : 0
+  name                      = local.service_environment_name
+  resource_group_name       = azurerm_resource_group.service.name
+  location                  = local.primary_region
+  offer_type                = "Standard"
   enable_automatic_failover = true
-
-  #is_virtual_network_filter_enabled = true
-  #ip_range_filter = var.cosmos_db_ip_range_filter
 
   consistency_policy {
     consistency_level = "Strong"
@@ -120,7 +121,7 @@ resource "azurerm_cosmosdb_account" "service" {
 
     content {
       location          = geo_location.value
-      failover_priority = index(var.regions, geo_location.value) # geo_location.value == local.primary_region ? 0 : 1
+      failover_priority = index(var.regions, geo_location.value)
     }
   }
 }
@@ -151,71 +152,16 @@ resource "azurerm_key_vault" "service" {
     tenant_id = data.azurerm_client_config.current.tenant_id
     object_id = data.azurerm_client_config.current.object_id
 
-    certificate_permissions = [
-      "backup",
-      "create",
-      "delete",
-      "deleteissuers",
-      "get",
-      "getissuers",
-      "import",
-      "list",
-      "listissuers",
-      "managecontacts",
-      "manageissuers",
-      "purge",
-      "recover",
-      "restore",
-      "setissuers",
-      "update"
-    ]
-
-    key_permissions = [
-      "backup",
-      "create",
-      "decrypt",
-      "delete",
-      "encrypt",
-      "get",
-      "import",
-      "list",
-      "purge",
-      "recover",
-      "restore",
-      "sign",
-      "unwrapKey",
-      "update",
-      "verify",
-      "wrapKey"
-    ]
-
-    secret_permissions = [
-      "backup",
-      "delete",
-      "get",
-      "list",
-      "purge",
-      "recover",
-      "restore",
-      "set"
-    ]
-
-    storage_permissions = [
-      "backup",
-      "delete",
-      "get",
-      "list",
-      "purge",
-      "recover",
-      "restore",
-      "set"
-    ]
+    certificate_permissions = var.key_vault_permissions.certificate_permissions
+    key_permissions         = var.key_vault_permissions.key_permissions
+    secret_permissions      = var.key_vault_permissions.secret_permissions
+    storage_permissions     = var.key_vault_permissions.storage_permissions
   }
 
   network_acls {
     default_action = "Deny"
     bypass         = "AzureServices"
-    ip_rules       = local.is_dev ? [local.current_ip] : null
+    ip_rules       = local.key_vault_ip_rules
   }
 }
 
@@ -226,7 +172,7 @@ resource "azurerm_key_vault" "service" {
 resource "azurerm_storage_account" "service" {
   for_each = toset(var.regions)
 
-  name                     = "${local.service_name}${each.key}${local.current_user_short}${var.environment}"
+  name                     = "${local.service_name}${each.key}${local.environment_differentiator_short}${var.environment}"
   resource_group_name      = azurerm_resource_group.service.name
   location                 = each.key
   account_tier             = var.storage_account_tier
@@ -265,6 +211,7 @@ resource "azurerm_mssql_server" "service" {
   administrator_login_password = random_password.sql_admin_password.result
   minimum_tls_version          = "1.2"
 
+  #TODO: determine if we should  set the admin
   #   azuread_administrator {
   #     login_username = "AzureAD Admin"
   #     object_id      = "00000000-0000-0000-0000-000000000000"
@@ -343,29 +290,34 @@ module "microservice" {
   source   = "./modules/microservice"
   for_each = { for microservice in var.microservices : microservice.name => microservice }
 
-  name              = each.value.name
-  appservice        = each.value.appservice
-  function          = each.value.function
-  sql               = each.value.sql
-  cosmos_containers = each.value.cosmos_containers == null ? [] : each.value.cosmos_containers
+  depends_on = [
+    azurerm_mssql_elasticpool.service,
+    azurerm_app_service_plan.service,
+    azurerm_app_service_plan.service_consumption
+  ]
 
-  #   cosmos_containers = each.value.cosmos_containers == null ? [] : [for container in each.value.cosmos_containers : {
-  #     name               = container.name
-  #     partition_key_path = container.partition_key_path
-  #     max_throughput     = container.max_throughput
-  #   }]
-
+  name                            = each.value.name
+  appservice                      = each.value.appservice
+  function                        = each.value.function
+  sql                             = each.value.sql
+  roles                           = each.value.roles
+  cosmos_containers               = each.value.cosmos_containers == null ? [] : each.value.cosmos_containers
   resource_group_name             = azurerm_resource_group.service.name
   retention_in_days               = var.retention_in_days
   primary_region                  = local.primary_region
   secondary_region                = local.secondary_region
   environment_name                = local.environment_name
+  callback_path                   = var.callback_path
+  key_vault_permissions           = var.key_vault_permissions
+  key_vault_ip_rules              = local.key_vault_ip_rules
+  azurerm_client_config           = data.azurerm_client_config.current
   application_insights            = azurerm_application_insights.service
   storage_accounts                = azurerm_storage_account.service
-  sql_server_id                   = azurerm_mssql_server.service[local.primary_region].id
-  sql_elastic_pool_id             = azurerm_mssql_elasticpool.service[local.primary_region].id
+  sql_server_id                   = local.has_sql_server ? azurerm_mssql_server.service[local.primary_region].id : null
+  sql_elastic_pool_id             = local.has_sql_server_elastic ? azurerm_mssql_elasticpool.service[local.primary_region].id : null
   cosmosdb_account_name           = local.has_cosmos ? azurerm_cosmosdb_account.service[0].name : null
   cosmosdb_sql_database_name      = local.has_cosmos ? azurerm_cosmosdb_sql_database.service[0].name : null
+  cosmosdb_endpoint               = local.has_cosmos ? azurerm_cosmosdb_account.service[0].endpoint : null
   cosmos_autoscale_max_throughput = var.cosmos_autoscale_max_throughput
   appservice_plans                = azurerm_app_service_plan.service
   appservice_deployment_slots     = var.appservice_deployment_slots
@@ -391,46 +343,8 @@ resource "azurerm_sql_failover_group" "service" {
     }
   }
 
-  #   partner_servers {
-  #     id = azurerm_sql_server.secondary.id
-  #   }
-
   read_write_endpoint_failover_policy {
     mode          = "Automatic"
     grace_minutes = 60
   }
-}
-
-#######################
-#### Output Values ####
-#######################
-
-output "current_azurerm" {
-  value = data.azurerm_client_config.current
-}
-
-output "current_user" {
-  value = data.azuread_user.current_user
-}
-
-output "locals" {
-  value = {
-    is_dev                   = local.is_dev
-    primary_region           = local.primary_region
-    service_name             = local.service_name
-    service_environment_name = local.service_environment_name
-    current_user             = local.current_user
-    has_cosmos               = local.has_cosmos
-    has_appservice_plan      = local.has_appservice_plan
-
-    max_region_length = local.max_region_length
-  }
-}
-
-output "azurerm_app_service_plan_service" {
-  value = azurerm_app_service_plan.service
-}
-
-output "microservices" {
-  value = module.microservice
 }

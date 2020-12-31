@@ -7,17 +7,16 @@ variable "use_msi_to_authenticate" {
 variable "environment" {
   type        = string
   description = "Terrform environment we're acting in"
-  default     = "dev"
   validation {
     condition     = contains(["dev", "test", "ppe", "prod"], lower(var.environment))
     error_message = "Environment must be 'dev', 'test', 'ppe', or 'prod'."
   }
 }
 
-variable "dev_differentiator" {
+variable "environment_differentiator" {
   type        = string
-  description = "Value can be used to allow multiple dev envrionments. Logged in azure AD user mail_nickname will be used as default."
-  default     = "matt"
+  description = "Value can be used to allow multiple envrionments. Logged in azure AD user mail_nickname will be used as default for dev environment unless specified."
+  default     = ""
 }
 
 variable "enable_backups" {
@@ -35,7 +34,12 @@ variable "retention_in_days" {
 variable "service_name" {
   type        = string
   description = "Name of microservice"
-  default     = "terra1"
+}
+
+variable "callback_path" {
+  type        = string
+  description = "Callback path for authorization"
+  default     = "/signin-oidc"
 }
 
 variable "cosmos_database_name" {
@@ -74,6 +78,7 @@ variable "microservices" {
     appservice = optional(string)
     function   = optional(string)
     sql        = optional(string)
+    roles      = optional(list(string))
     cosmos_containers = optional(list(object({
       name               = string
       partition_key_path = string
@@ -81,62 +86,6 @@ variable "microservices" {
       max_throughput = number
     })))
   }))
-  default = [
-
-    {
-      name       = "cosm1"
-      appservice = "plan"
-      function   = "plan"
-      sql        = "elastic"
-      cosmos_containers = [
-        {
-          name               = "container1"
-          partition_key_path = "/PartitionKey"
-          max_throughput     = 0
-        },
-        {
-          name               = "container2"
-          partition_key_path = "/PartitionKey"
-          max_throughput     = 0
-        }
-      ]
-    },
-    {
-      name       = "confun"
-      appservice = "plan"
-      function   = "consumption"
-      sql        = "elastic"
-    },
-    {
-      name       = "basic"
-      appservice = "plan"
-      function   = "plan"
-      sql        = "elastic"
-    },
-    {
-      name       = "cosm2"
-      appservice = "plan"
-      cosmos_containers = [
-        {
-          name               = "container3"
-          partition_key_path = "/PartitionKey"
-          max_throughput     = 0
-        }
-      ]
-    },
-    {
-      name     = "funp"
-      function = "plan"
-    },
-    {
-      name     = "func"
-      function = "consumption"
-    },
-    {
-      name       = "apponly"
-      appservice = "plan"
-    }
-  ]
 }
 
 variable "primary_region" {
@@ -154,7 +103,6 @@ variable "secondary_region" {
 variable "regions" {
   type        = list(string)
   description = "Azure regions the service is located in"
-  default     = ["westus2", "eastus"]
   validation {
     condition     = length(var.regions) > 0
     error_message = "Must provide at least 1 region to deploy."
@@ -176,4 +124,75 @@ variable "storage_account_replication_type" {
   description = "Defines the type of replication to use for this storage"
   type        = string
   default     = "RAGRS"
+}
+
+variable "key_vault_permissions" {
+  description = "Permissions applied to Key Vault for the provisioning account"
+  type = object({
+    certificate_permissions = list(string)
+    key_permissions         = list(string)
+    secret_permissions      = list(string)
+    storage_permissions     = list(string)
+  })
+  default = {
+    certificate_permissions = [
+      "backup",
+      "create",
+      "delete",
+      "deleteissuers",
+      "get",
+      "getissuers",
+      "import",
+      "list",
+      "listissuers",
+      "managecontacts",
+      "manageissuers",
+      "purge",
+      "recover",
+      "restore",
+      "setissuers",
+      "update"
+    ]
+
+    key_permissions = [
+      "backup",
+      "create",
+      "decrypt",
+      "delete",
+      "encrypt",
+      "get",
+      "import",
+      "list",
+      "purge",
+      "recover",
+      "restore",
+      "sign",
+      "unwrapKey",
+      "update",
+      "verify",
+      "wrapKey"
+    ]
+
+    secret_permissions = [
+      "backup",
+      "delete",
+      "get",
+      "list",
+      "purge",
+      "recover",
+      "restore",
+      "set"
+    ]
+
+    storage_permissions = [
+      "backup",
+      "delete",
+      "get",
+      "list",
+      "purge",
+      "recover",
+      "restore",
+      "set"
+    ]
+  }
 }

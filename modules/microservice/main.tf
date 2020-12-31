@@ -7,14 +7,15 @@ terraform {
 #### Locals and Data ####
 #########################
 
-data "azurerm_subscription" "current" {}
-
 locals {
-  has_appservice            = var.appservice == "plan"
-  appservice_plans          = local.has_appservice ? var.appservice_plans : {}
-  has_function              = var.function == "plan" || var.function == "consumption"
-  function_appservice_plans = var.function == "plan" ? var.appservice_plans : var.function == "consumption" ? var.consumption_appservice_plans : {}
-  has_sql_database          = var.sql == "server" || var.sql == "elastic"
+  microservice_environment_name = "${var.name}-${var.environment_name}"
+  has_key_vault                 = true
+  has_appservice                = var.appservice == "plan"
+  appservice_plans              = local.has_appservice ? var.appservice_plans : {}
+  has_function                  = var.function == "plan" || var.function == "consumption"
+  function_appservice_plans     = var.function == "plan" ? var.appservice_plans : var.function == "consumption" ? var.consumption_appservice_plans : {}
+  has_sql_database              = var.sql == "server" || var.sql == "elastic"
+  has_cosmos_container          = length(var.cosmos_containers) > 0
 }
 
 ################################
@@ -22,13 +23,115 @@ locals {
 ################################
 
 ### Create UserAssigned MSI for resources (KeyVault, Sql, Cosmos, ServiceBus)
+resource "azurerm_user_assigned_identity" "microservice_key_vault" {
+  count = local.has_key_vault ? 1 : 0
+
+  name                = "${var.name}-keyvault-${var.environment_name}"
+  resource_group_name = var.resource_group_name
+  location            = var.primary_region
+}
+
+resource "azurerm_user_assigned_identity" "microservice_sql" {
+  count = local.has_sql_database ? 1 : 0
+
+  name                = "${var.name}-sql-${var.environment_name}"
+  resource_group_name = var.resource_group_name
+  location            = var.primary_region
+}
+
+resource "azurerm_user_assigned_identity" "microservice_cosmos" {
+  count = local.has_cosmos_container ? 1 : 0
+
+  name                = "${var.name}-cosmos-${var.environment_name}"
+  resource_group_name = var.resource_group_name
+  location            = var.primary_region
+}
+
+### Key Vault
+resource "azurerm_key_vault" "microservice" {
+  count = local.has_key_vault ? 1 : 0
+
+  name                        = local.microservice_environment_name
+  location                    = var.primary_region
+  resource_group_name         = var.resource_group_name
+  enabled_for_disk_encryption = true
+  tenant_id                   = var.azurerm_client_config.tenant_id
+  soft_delete_enabled         = true
+  soft_delete_retention_days  = var.retention_in_days
+  purge_protection_enabled    = false
+  sku_name                    = "standard"
+
+  access_policy {
+    tenant_id = var.azurerm_client_config.tenant_id
+    object_id = var.azurerm_client_config.object_id
+
+    certificate_permissions = var.key_vault_permissions.certificate_permissions
+    key_permissions         = var.key_vault_permissions.key_permissions
+    secret_permissions      = var.key_vault_permissions.secret_permissions
+    storage_permissions     = var.key_vault_permissions.storage_permissions
+  }
+
+  network_acls {
+    default_action = "Deny"
+    bypass         = "AzureServices"
+    ip_rules       = var.key_vault_ip_rules
+  }
+}
+
+resource "azurerm_key_vault_access_policy" "microservice" {
+  count = local.has_key_vault ? 1 : 0
+
+  key_vault_id = azurerm_key_vault.microservice[0].id
+  tenant_id    = var.azurerm_client_config.tenant_id
+  object_id    = azurerm_user_assigned_identity.microservice_key_vault[0].principal_id
+
+  key_permissions = [
+    "get",
+  ]
+
+  secret_permissions = [
+    "get",
+  ]
+}
+
+### AAD Application
+
+resource "azuread_application" "microservice" {
+  name                       = local.microservice_environment_name
+  prevent_duplicate_names    = true
+  oauth2_allow_implicit_flow = true
+  identifier_uris            = [lower("https://${local.microservice_environment_name}.trafficmanager.net/")]
+  owners                     = [var.azurerm_client_config.object_id]
+  group_membership_claims    = "None"
+  oauth2_permissions         = []
+  reply_urls = [
+    lower("https://${local.microservice_environment_name}.trafficmanager.net/"),
+    lower("https://${local.microservice_environment_name}.trafficmanager.net${var.callback_path}")
+  ]
+}
+
+# Combining the default InternalService role with additional roles
+locals {
+  application_roles = concat(["InternalService"], coalesce(var.roles, []))
+}
+
+resource "azuread_application_app_role" "microservice" {
+  for_each = toset(local.application_roles)
+
+  application_object_id = azuread_application.microservice.id
+  allowed_member_types  = ["Application", "User"]
+  description           = "${each.value} for service"
+  display_name          = each.value
+  is_enabled            = true
+  value                 = each.value
+}
 
 ### SQL Database
 
 resource "azurerm_mssql_database" "microservice" {
   count = local.has_sql_database ? 1 : 0
 
-  name            = "${var.name}-${var.environment_name}"
+  name            = local.microservice_environment_name
   server_id       = var.sql_server_id
   elastic_pool_id = var.sql == "elastic" ? var.sql_elastic_pool_id : null
   collation       = "SQL_Latin1_General_CP1_CI_AS"
@@ -79,18 +182,44 @@ resource "azurerm_cosmosdb_sql_container" "microservice" {
 ### Appservice
 
 locals {
-  appservice_app_settings = {
-    "APPINSIGHTS_INSTRUMENTATIONKEY"             = var.application_insights.instrumentation_key
-    "APPLICATIONINSIGHTS_CONNECTION_STRING"      = var.application_insights.connection_string
-    "ApplicationInsightsAgent_EXTENSION_VERSION" = "~2",
-    "AzureAd:TenantId"                           = data.azurerm_subscription.current.tenant_id
-  }
+  appservice_app_settings = merge(
+    {
+      "APPINSIGHTS_INSTRUMENTATIONKEY"             = var.application_insights.instrumentation_key
+      "APPLICATIONINSIGHTS_CONNECTION_STRING"      = var.application_insights.connection_string
+      "ApplicationInsightsAgent_EXTENSION_VERSION" = "~2"
+      "AzureAd:Instance"                           = "https://login.microsoftonline.com/"
+      "AzureAd:Domain"                             = "microsoft.onmicrosoft.com"
+      "AzureAd:TenantId"                           = var.azurerm_client_config.tenant_id
+      "AzureAd:ClientId"                           = azuread_application.microservice.id
+      "AzureAd:CallbackPath"                       = var.callback_path
+      "ApplicationInsights:InstrumentationKey"     = var.application_insights.instrumentation_key
+    },
+    local.has_key_vault ? {
+      "KeyVault:BaseUri"             = azurerm_key_vault.microservice[0].vault_uri
+      "KeyVault:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_key_vault[0].client_id
+    } : {},
+    local.has_sql_database ? {
+      "Database:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_sql[0].client_id
+    } : {},
+    local.has_cosmos_container ? {
+      "DocumentStore:Url"                 = var.cosmosdb_endpoint
+      "DocumentStore:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_cosmos[0].client_id
+    } : {}
+  )
 }
 
 locals {
   appservice_function_app_settings = {
     "FUNCTIONS_WORKER_RUNTIME" = "dotnet",
   }
+}
+
+locals {
+  user_assigned_identities = concat(
+    local.has_key_vault ? [azurerm_user_assigned_identity.microservice_key_vault[0].id] : [],
+    local.has_sql_database ? [azurerm_user_assigned_identity.microservice_sql[0].id] : [],
+    local.has_cosmos_container ? [azurerm_user_assigned_identity.microservice_cosmos[0].id] : []
+  )
 }
 
 resource "azurerm_app_service" "microservice" {
@@ -113,21 +242,17 @@ resource "azurerm_app_service" "microservice" {
 
   app_settings = local.appservice_app_settings
 
-  #   app_settings = {
-  #     "APPINSIGHTS_INSTRUMENTATIONKEY"             = var.application_insights.instrumentation_key
-  #     "APPLICATIONINSIGHTS_CONNECTION_STRING"      = var.application_insights.connection_string
-  #     "ApplicationInsightsAgent_EXTENSION_VERSION" = "~2",
-  #     "FUNCTIONS_WORKER_RUNTIME"                   = "dotnet",
-  #     "AzureAd:TenantId"                           = data.azurerm_subscription.current.tenant_id
-  #   }
-
   #   storage_account {
   #     name       = var.storage_accounts[each.value.location].name
   #     access_key = var.storage_accounts[each.value.location].primary_access_key
   #   }
 
-  identity {
-    type = "SystemAssigned"
+  dynamic "identity" {
+    for_each = length(local.user_assigned_identities) > 0 ? [local.user_assigned_identities] : []
+    content {
+      type         = "UserAssigned"
+      identity_ids = local.user_assigned_identities
+    }
   }
 }
 
@@ -179,7 +304,8 @@ resource "azurerm_function_app" "microservice" {
   app_settings = merge(local.appservice_app_settings, local.appservice_function_app_settings)
 
   identity {
-    type = "SystemAssigned"
+    type         = "UserAssigned"
+    identity_ids = local.user_assigned_identities
   }
 }
 
@@ -218,12 +344,12 @@ resource "azurerm_function_app_slot" "microservice" {
 ### Traffic Manager
 
 resource "azurerm_traffic_manager_profile" "microservice" {
-  name                   = "${var.name}-${var.environment_name}"
+  name                   = local.microservice_environment_name
   resource_group_name    = var.resource_group_name
   traffic_routing_method = "Performance"
 
   dns_config {
-    relative_name = "${var.name}-${var.environment_name}"
+    relative_name = local.microservice_environment_name
     ttl           = 60
   }
 
@@ -256,19 +382,3 @@ resource "azurerm_traffic_manager_endpoint" "microservice" {
     azurerm_function_app_slot.microservice
   ]
 }
-
-#######################
-#### Output Values ####
-#######################
-
-output "name" {
-  value = var.name
-}
-
-output "database_id" {
-  value = local.has_sql_database ? azurerm_mssql_database.microservice[0].id : null
-}
-
-# output "azurerm_app_service_microservice" {
-#   value = azurerm_app_service.microservice
-# }

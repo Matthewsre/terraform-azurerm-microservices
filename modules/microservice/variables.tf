@@ -34,6 +34,17 @@ variable "environment_name" {
   description = "Name of the environment"
 }
 
+variable "roles" {
+  type        = list(string)
+  description = "Roles to provision for the AAD application"
+  default     = []
+}
+
+variable "callback_path" {
+  type        = string
+  description = "Callback path for authorization"
+}
+
 variable "appservice" {
   type        = string
   description = "Specify appservice type if used ('plan' or 'consumption')"
@@ -97,6 +108,12 @@ variable "cosmosdb_account_name" {
   default     = ""
 }
 
+variable "cosmosdb_endpoint" {
+  type        = string
+  description = "Cosmos DB endpoint"
+  default     = ""
+}
+
 variable "cosmosdb_sql_database_name" {
   type        = string
   description = "Cosmos SQL database name"
@@ -106,6 +123,14 @@ variable "cosmosdb_sql_database_name" {
 variable "cosmos_autoscale_max_throughput" {
   type        = number
   description = "Max throughput of Cosmos database"
+}
+
+variable "azurerm_client_config" {
+  type = object({
+    tenant_id = string
+    object_id = string
+  })
+  description = "Azurerm provider client configuration to use"
 }
 
 variable "application_insights" {
@@ -144,4 +169,19 @@ variable "consumption_appservice_plans" {
   }))
   description = "Consumption based appservice plans to use"
   default     = {}
+}
+
+variable "key_vault_permissions" {
+  description = "Permissions applied to Key Vault for the provisioning account"
+  type = object({
+    certificate_permissions = list(string)
+    key_permissions         = list(string)
+    secret_permissions      = list(string)
+    storage_permissions     = list(string)
+  })
+}
+
+variable "key_vault_ip_rules" {
+  description = "One or more IP Addresses, or CIDR Blocks which should be able to access the Key Vault"
+  type        = list(string)
 }
