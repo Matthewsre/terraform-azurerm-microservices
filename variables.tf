@@ -57,7 +57,7 @@ variable "cosmos_autoscale_max_throughput" {
 variable "appservice_deployment_slots" {
   description = "Additional deployment slots for app services. Standard and above plans allow for deployment slot."
   type        = list(string)
-  default     = ["staging"]
+  default     = []
 }
 
 variable "appservice_plan_tier" {

@@ -4,6 +4,28 @@ This module is to help standardize microservice provisioning
 
 Documentation will be added soon
 
+## Features
+
+Provisioning multi-region microservices on Azure with minimal input to describe your service
+
+Hosting Configurations:
+* App Service
+* Functions
+
+Data Store Configurations:
+* SQL Elastic Pool
+* CosmosDB
+
+Additional Configurations:
+* Application Insights
+* Storage
+* Key Vault
+* Deployment Slots
+* Managed Identity
+* Traffic Manager
+* SQL Failover Group
+
+
 ## Usage
 
 ```hcl
@@ -24,6 +46,13 @@ module "microservice" {
       name       = "service2"
       appservice = "plan"
       function   = "plan"
+      cosmos_containers = [
+        {
+          name               = "container1"
+          partition_key_path = "/PartitionKey"
+          max_throughput     = 0
+        }
+      ]
     },
     {
       name       = "service3"
@@ -41,7 +70,7 @@ module "microservice" {
       appservice = "plan"
       cosmos_containers = [
         {
-          name               = "container1"
+          name               = "container2"
           partition_key_path = "/PartitionKey"
           max_throughput     = 0
         }

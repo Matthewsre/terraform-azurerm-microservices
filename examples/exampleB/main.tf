@@ -1,7 +1,10 @@
 module "microservice" {
   source = "../../"
 
-  service_name = "myservice"
+  service_name                = "serv"
+  regions                     = ["westus2", "eastus2"]
+  environment                 = "dev"
+  appservice_deployment_slots = ["staging"]
   microservices = [
     {
       name       = "cosm1"
