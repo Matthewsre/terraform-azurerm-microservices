@@ -31,7 +31,7 @@ Additional Configurations:
 ```hcl
 
 module "microservice" {
-  source = "github.com/matthewsre/terraform-microservices"
+  source = "github.com/matthewsre/terraform-azurerm-microservices"
 
   service_name = "myservice"
   regions      = ["westus2", "eastus"]
