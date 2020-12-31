@@ -1,7 +1,6 @@
 terraform {
   required_version = ">= 0.14"
-  #backend "azurerm" {}
-  experiments = [module_variable_optional_attrs]
+  experiments      = [module_variable_optional_attrs]
 }
 
 provider "azurerm" {
