@@ -72,6 +72,14 @@ variable "appservice_plan_size" {
   default     = "S1" #"B1"
 }
 
+variable "servicebus_sku" {
+  type        = string
+  description = "Sku of shared ServiceBus namespace."
+  default     = "Basic"
+}
+
+# opened bug for lists with optional values https://github.com/hashicorp/terraform/issues/27374
+# this impacts cosmos_containers.max_throughput
 variable "microservices" {
   type = list(object({
     name       = string
@@ -79,11 +87,18 @@ variable "microservices" {
     function   = optional(string)
     sql        = optional(string)
     roles      = optional(list(string))
+    http = optional(object({
+      target    = string
+      consumers = list(string)
+    }))
+    queues = optional(list(object({
+      name       = string
+      publishers = list(string)
+    })))
     cosmos_containers = optional(list(object({
       name               = string
       partition_key_path = string
-      # opened bug for list https://github.com/hashicorp/terraform/issues/27374
-      max_throughput = number
+      max_throughput     = number
     })))
   }))
 }

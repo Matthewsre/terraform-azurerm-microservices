@@ -1,7 +1,8 @@
 module "microservice" {
-  source = "Matthewsre/microservices/azurerm"
+  source = "../../"
+  #source = "Matthewsre/microservices/azurerm"
 
-  service_name                = "serv"
+  service_name                = "serv2"
   regions                     = ["westus2", "eastus2"]
   environment                 = "dev"
   appservice_deployment_slots = ["staging"]
@@ -12,6 +13,16 @@ module "microservice" {
       function   = "plan"
       sql        = "elastic"
       roles      = ["Admin", "Support"]
+      http = {
+        target    = "appservice"
+        consumers = []
+      },
+      queues = [
+        {
+          name       = "queue1"
+          publishers = ["cosm1", "basic"]
+        }
+      ]
       cosmos_containers = [
         {
           name               = "container1"

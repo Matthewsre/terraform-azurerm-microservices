@@ -38,17 +38,19 @@ locals {
   service_environment_name            = local.is_dev ? "${var.service_name}-${local.environment_differentiator}-${var.environment}" : "${var.service_name}-${var.environment}"
   environment_differentiator          = var.environment_differentiator != "" ? var.environment_differentiator : local.is_dev && length(data.azuread_user.current_user) > 0 ? split(".", split("_", split("#EXT#", data.azuread_user.current_user[0].mail_nickname)[0])[0])[0] : ""
   has_cosmos                          = length({ for microservice in var.microservices : microservice.name => microservice if microservice.cosmos_containers != null ? length(microservice.cosmos_containers) > 0 : false }) > 0
+  has_queues                          = length({ for microservice in var.microservices : microservice.name => microservice if microservice.queues != null ? length(microservice.queues) > 0 : false }) > 0
   has_sql_server_elastic              = length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "elastic" }) > 0
   has_sql_server                      = local.has_sql_server_elastic || length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "server" }) > 0
   has_appservice_plan                 = length({ for microservice in var.microservices : microservice.name => microservice if microservice.appservice == "plan" || microservice.function == "plan" }) > 0
   has_consumption_appservice_plan     = length({ for microservice in var.microservices : microservice.name => microservice if microservice.function == "consumption" }) > 0
+  servicebus_regions                  = local.has_queues ? lower(var.servicebus_sku) == "premium" ? var.regions : [local.primary_region] : []
   appservice_plan_regions             = local.has_appservice_plan ? var.regions : []
   consumption_appservice_plan_regions = local.has_consumption_appservice_plan ? var.regions : []
   sql_server_regions                  = local.has_sql_server ? local.secondary_region != null ? [local.primary_region, local.secondary_region] : [local.primary_region] : []
   sql_server_elastic_regions          = local.has_sql_server_elastic ? local.sql_server_regions : []
   admin_login                         = "${var.service_name}-admin"
 
-  # if this becomes a problem can standardize envrionments to be 3 char (dev, tst, ppe, prd)
+  # if this becomes a problem can standardize environments to be 3 char (dev, tst, ppe, prd)
   # 24 characters is used for max storage name
   max_storage_name_length              = 24
   max_region_length                    = reverse(sort([for region in var.regions : length(region)]))[0] # bug is preventing max() from working used sort and reverse instead
@@ -178,6 +180,20 @@ resource "azurerm_storage_account" "service" {
   account_replication_type = var.storage_account_replication_type
 }
 
+#### Service Bus
+
+resource "azurerm_servicebus_namespace" "service" {
+  for_each = toset(local.servicebus_regions)
+
+  name                = "${local.service_name}${each.key}${local.environment_name}"
+  resource_group_name = azurerm_resource_group.service.name
+  location            = each.key
+  sku                 = var.servicebus_sku
+}
+
+# Pairing for geo redundancy is not yet supported by terraform provider
+# Open issue here: https://github.com/terraform-providers/terraform-provider-azurerm/issues/3136
+
 #### SQL Server
 
 resource "random_password" "sql_admin_password" {
@@ -256,7 +272,7 @@ resource "azurerm_mssql_elasticpool" "service" {
 resource "azurerm_app_service_plan" "service" {
   for_each = toset(local.appservice_plan_regions)
 
-  name                = "${local.service_name}${each.key}${local.environment_name}"
+  name                = "${local.service_name}-${each.key}-${local.environment_name}"
   location            = each.key
   resource_group_name = azurerm_resource_group.service.name
   #per_site_scaling    = true
@@ -270,7 +286,7 @@ resource "azurerm_app_service_plan" "service" {
 resource "azurerm_app_service_plan" "service_consumption" {
   for_each = toset(local.consumption_appservice_plan_regions)
 
-  name                = "${local.service_name}dyn${each.key}${local.environment_name}"
+  name                = "${local.service_name}-dyn-${each.key}-${local.environment_name}"
   location            = each.key
   resource_group_name = azurerm_resource_group.service.name
   kind                = "FunctionApp"
@@ -289,18 +305,14 @@ module "microservice" {
   source   = "./modules/microservice"
   for_each = { for microservice in var.microservices : microservice.name => microservice }
 
-  depends_on = [
-    azurerm_mssql_elasticpool.service,
-    azurerm_app_service_plan.service,
-    azurerm_app_service_plan.service_consumption
-  ]
-
   name                            = each.value.name
   appservice                      = each.value.appservice
   function                        = each.value.function
   sql                             = each.value.sql
   roles                           = each.value.roles
+  http                            = each.value.http
   cosmos_containers               = each.value.cosmos_containers == null ? [] : each.value.cosmos_containers
+  queues                          = each.value.queues == null ? [] : each.value.queues
   resource_group_name             = azurerm_resource_group.service.name
   retention_in_days               = var.retention_in_days
   primary_region                  = local.primary_region
@@ -318,9 +330,16 @@ module "microservice" {
   cosmosdb_sql_database_name      = local.has_cosmos ? azurerm_cosmosdb_sql_database.service[0].name : null
   cosmosdb_endpoint               = local.has_cosmos ? azurerm_cosmosdb_account.service[0].endpoint : null
   cosmos_autoscale_max_throughput = var.cosmos_autoscale_max_throughput
+  servicebus_namespaces           = azurerm_servicebus_namespace.service
   appservice_plans                = azurerm_app_service_plan.service
   appservice_deployment_slots     = var.appservice_deployment_slots
   consumption_appservice_plans    = azurerm_app_service_plan.service_consumption
+
+  depends_on = [
+    azurerm_mssql_elasticpool.service,
+    azurerm_app_service_plan.service,
+    azurerm_app_service_plan.service_consumption
+  ]
 }
 
 #### SQL Failover with all database ids from microservices
