@@ -43,14 +43,14 @@ locals {
   has_sql_server                      = local.has_sql_server_elastic || length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "server" }) > 0
   has_appservice_plan                 = length({ for microservice in var.microservices : microservice.name => microservice if microservice.appservice == "plan" || microservice.function == "plan" }) > 0
   has_consumption_appservice_plan     = length({ for microservice in var.microservices : microservice.name => microservice if microservice.function == "consumption" }) > 0
-  servicebus_regions                  = local.has_queues ? var.regions : []
+  servicebus_regions                  = local.has_queues ? lower(var.servicebus_sku) == "premium" ? var.regions : [local.primary_region] : []
   appservice_plan_regions             = local.has_appservice_plan ? var.regions : []
   consumption_appservice_plan_regions = local.has_consumption_appservice_plan ? var.regions : []
   sql_server_regions                  = local.has_sql_server ? local.secondary_region != null ? [local.primary_region, local.secondary_region] : [local.primary_region] : []
   sql_server_elastic_regions          = local.has_sql_server_elastic ? local.sql_server_regions : []
   admin_login                         = "${var.service_name}-admin"
 
-  # if this becomes a problem can standardize envrionments to be 3 char (dev, tst, ppe, prd)
+  # if this becomes a problem can standardize environments to be 3 char (dev, tst, ppe, prd)
   # 24 characters is used for max storage name
   max_storage_name_length              = 24
   max_region_length                    = reverse(sort([for region in var.regions : length(region)]))[0] # bug is preventing max() from working used sort and reverse instead
@@ -188,7 +188,7 @@ resource "azurerm_servicebus_namespace" "service" {
   name                = "${local.service_name}${each.key}${local.environment_name}"
   resource_group_name = azurerm_resource_group.service.name
   location            = each.key
-  sku                 = "Standard"
+  sku                 = var.servicebus_sku
 }
 
 # Pairing for geo redundancy is not yet supported by terraform provider

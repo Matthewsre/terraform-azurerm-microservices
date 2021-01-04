@@ -72,6 +72,12 @@ variable "appservice_plan_size" {
   default     = "S1" #"B1"
 }
 
+variable "servicebus_sku" {
+  type        = string
+  description = "Sku of shared ServiceBus namespace."
+  default     = "Basic"
+}
+
 # opened bug for lists with optional values https://github.com/hashicorp/terraform/issues/27374
 # this impacts cosmos_containers.max_throughput
 variable "microservices" {
