@@ -80,6 +80,15 @@ variable "sql" {
   }
 }
 
+variable "http" {
+  type = object({
+    target    = string
+    consumers = optional(list(string))
+  })
+  description = "Target option for http traffic manager configuration and optional consumers to request role"
+  default     = null
+}
+
 variable "sql_server_id" {
   type        = string
   description = "Server Id for SQL"
@@ -99,6 +108,15 @@ variable "cosmos_containers" {
     max_throughput     = optional(number)
   }))
   description = "Microservice containers for cosmos DB"
+  default     = []
+}
+
+variable "queues" {
+  type = list(object({
+    name       = string
+    publishers = list(string)
+  }))
+  description = "Queues for microservice consumption and publishers"
   default     = []
 }
 
@@ -150,6 +168,16 @@ variable "storage_accounts" {
   }))
   description = "Storage accounts to use"
   sensitive   = true
+  default     = {}
+}
+
+variable "servicebus_namespaces" {
+  type = map(object({
+    id       = string
+    name     = string
+    location = string
+  }))
+  description = "ServiceBus Namespaces to use"
   default     = {}
 }
 

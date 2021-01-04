@@ -15,6 +15,7 @@ locals {
   has_function                  = var.function == "plan" || var.function == "consumption"
   function_appservice_plans     = var.function == "plan" ? var.appservice_plans : var.function == "consumption" ? var.consumption_appservice_plans : {}
   has_sql_database              = var.sql == "server" || var.sql == "elastic"
+  has_servicebus_queues         = var.queues != null && length(var.queues) > 0
   has_cosmos_container          = length(var.cosmos_containers) > 0
 }
 
@@ -35,6 +36,17 @@ resource "azurerm_user_assigned_identity" "microservice_sql" {
   count = local.has_sql_database ? 1 : 0
 
   name                = "${var.name}-sql-${var.environment_name}"
+  resource_group_name = var.resource_group_name
+  location            = var.primary_region
+}
+
+# ServiceBus azure function triggers don't support managed identity
+# "The Service Bus binding doesn't currently support authentication using a managed identity. Instead, please use a Service Bus shared access signature."
+# https://docs.microsoft.com/en-us/azure/azure-functions/functions-bindings-service-bus
+resource "azurerm_user_assigned_identity" "microservice_servicebus" {
+  count = local.has_servicebus_queues ? 1 : 0
+
+  name                = "${var.name}-servicebus-${var.environment_name}"
   resource_group_name = var.resource_group_name
   location            = var.primary_region
 }
@@ -92,6 +104,18 @@ resource "azurerm_key_vault_access_policy" "microservice" {
   secret_permissions = [
     "get",
   ]
+}
+
+locals {
+  queues = local.has_servicebus_queues ? flatten([for queue in var.queues : [for namespace in var.servicebus_namespaces : { queue = queue, namespace = namespace }]]) : []
+}
+
+resource "azurerm_servicebus_queue" "microservice" {
+  for_each = { for queue in local.queues : "${queue.queue.name}-${queue.namespace.name}" => queue }
+
+  name                = "${var.name}-${each.value.queue.name}"
+  resource_group_name = var.resource_group_name
+  namespace_name      = each.value.namespace.name
 }
 
 ### AAD Application
@@ -201,6 +225,9 @@ locals {
     local.has_sql_database ? {
       "Database:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_sql[0].client_id
     } : {},
+    local.has_servicebus_queues ? {
+      "ServiceBus:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_servicebus[0].client_id
+    } : {},
     local.has_cosmos_container ? {
       "DocumentStore:Url"                 = var.cosmosdb_endpoint
       "DocumentStore:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_cosmos[0].client_id
@@ -209,15 +236,23 @@ locals {
 }
 
 locals {
-  appservice_function_app_settings = {
-    "FUNCTIONS_WORKER_RUNTIME" = "dotnet",
-  }
+  appservice_function_app_settings = merge(
+    {
+      "FUNCTIONS_WORKER_RUNTIME" = "dotnet",
+    },
+    local.has_servicebus_queues ? {
+      "ServiceBusConnection" = ""
+      # Commenting out until User Assigned Identity is supported by Service Bus Functions
+      # "ServiceBus:ManagedServiceAppId" = "Endpoint=sb://<NAMESPACE NAME>.servicebus.windows.net/;Authentication=Managed Identity${azurerm_user_assigned_identity.microservice_servicebus[0].client_id}"
+    } : {}
+  )
 }
 
 locals {
   user_assigned_identities = concat(
     local.has_key_vault ? [azurerm_user_assigned_identity.microservice_key_vault[0].id] : [],
     local.has_sql_database ? [azurerm_user_assigned_identity.microservice_sql[0].id] : [],
+    local.has_servicebus_queues ? [azurerm_user_assigned_identity.microservice_servicebus[0].id] : [],
     local.has_cosmos_container ? [azurerm_user_assigned_identity.microservice_cosmos[0].id] : []
   )
 }
@@ -277,6 +312,10 @@ resource "azurerm_app_service_slot" "microservice" {
     websockets_enabled       = each.value.appservice.site_config[0].websockets_enabled
     always_on                = each.value.appservice.site_config[0].always_on
   }
+
+  depends_on = [
+    azurerm_app_service.microservice
+  ]
 }
 
 ### Function
@@ -318,6 +357,7 @@ locals {
       location          = slot.appservice.location
       app_service_id    = slot.appservice.id
     }
+    if slot.slot != null && slot.slot != ""
   }
 }
 
@@ -339,6 +379,10 @@ resource "azurerm_function_app_slot" "microservice" {
     websockets_enabled = azurerm_function_app.microservice[each.value.location].site_config[0].websockets_enabled
     always_on          = azurerm_function_app.microservice[each.value.location].site_config[0].always_on
   }
+
+  depends_on = [
+    azurerm_function_app.microservice
+  ]
 }
 
 ### Traffic Manager
