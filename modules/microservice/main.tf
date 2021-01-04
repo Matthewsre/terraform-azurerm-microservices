@@ -17,6 +17,9 @@ locals {
   has_sql_database              = var.sql == "server" || var.sql == "elastic"
   has_servicebus_queues         = var.queues != null && length(var.queues) > 0
   has_cosmos_container          = length(var.cosmos_containers) > 0
+  has_http                      = var.http != null
+  http_target                   = local.has_http ? var.http.target : local.has_appservice ? "appservice" : local.has_function ? "function" : null
+  consumers                     = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
 }
 
 ################################
@@ -241,7 +244,7 @@ locals {
       "FUNCTIONS_WORKER_RUNTIME" = "dotnet",
     },
     local.has_servicebus_queues ? {
-      "ServiceBusConnection" = ""
+      "ServiceBusConnection" = "Endpoint=sb://${var.servicebus_namespaces[0]}.servicebus.windows.net/;"
       # Commenting out until User Assigned Identity is supported by Service Bus Functions
       # "ServiceBus:ManagedServiceAppId" = "Endpoint=sb://<NAMESPACE NAME>.servicebus.windows.net/;Authentication=Managed Identity${azurerm_user_assigned_identity.microservice_servicebus[0].client_id}"
     } : {}
@@ -407,12 +410,24 @@ resource "azurerm_traffic_manager_profile" "microservice" {
   }
 }
 
-locals {
-  endpoints = local.has_appservice ? azurerm_app_service.microservice : {}
+resource "azurerm_traffic_manager_endpoint" "microservice_appservice" {
+  for_each = local.http_target == "appservice" ? azurerm_app_service.microservice : {}
+
+  name                = each.value.location
+  resource_group_name = var.resource_group_name
+  profile_name        = azurerm_traffic_manager_profile.microservice.name
+  type                = "azureEndpoints"
+  target_resource_id  = each.value.id
+
+  # traffic manager can cause conflict errors if running in parallel with slot creation
+  depends_on = [
+    azurerm_app_service_slot.microservice,
+    azurerm_function_app_slot.microservice
+  ]
 }
 
-resource "azurerm_traffic_manager_endpoint" "microservice" {
-  for_each = local.endpoints
+resource "azurerm_traffic_manager_endpoint" "microservice_function" {
+  for_each = local.http_target == "function" ? azurerm_function_app.microservice : {}
 
   name                = each.value.location
   resource_group_name = var.resource_group_name

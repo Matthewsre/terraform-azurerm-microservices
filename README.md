@@ -25,6 +25,9 @@ Additional Configurations:
 * Traffic Manager
 * SQL Failover Group
 
+## Structure
+
+![architecture](documentation/microservice-architecture.PNG)
 
 ## Usage
 

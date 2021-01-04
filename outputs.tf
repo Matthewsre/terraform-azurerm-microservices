@@ -1,12 +1,15 @@
 output "current_azurerm" {
-  value = data.azurerm_client_config.current
+  description = "current azure client configuration"
+  value       = data.azurerm_client_config.current
 }
 
 output "current_user" {
-  value = data.azuread_user.current_user
+  description = "current user account performing operation"
+  value       = data.azuread_user.current_user
 }
 
 output "locals" {
+  description = "local values created base on input data"
   value = {
     is_dev                     = local.is_dev
     primary_region             = local.primary_region
@@ -19,10 +22,7 @@ output "locals" {
   }
 }
 
-output "azurerm_app_service_plan_service" {
-  value = azurerm_app_service_plan.service
-}
-
 output "microservices" {
-  value = module.microservice
+  description = "Details from microservice creation."
+  value       = module.microservice
 }

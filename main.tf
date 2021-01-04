@@ -272,7 +272,7 @@ resource "azurerm_mssql_elasticpool" "service" {
 resource "azurerm_app_service_plan" "service" {
   for_each = toset(local.appservice_plan_regions)
 
-  name                = "${local.service_name}${each.key}${local.environment_name}"
+  name                = "${local.service_name}-${each.key}-${local.environment_name}"
   location            = each.key
   resource_group_name = azurerm_resource_group.service.name
   #per_site_scaling    = true
@@ -286,7 +286,7 @@ resource "azurerm_app_service_plan" "service" {
 resource "azurerm_app_service_plan" "service_consumption" {
   for_each = toset(local.consumption_appservice_plan_regions)
 
-  name                = "${local.service_name}dyn${each.key}${local.environment_name}"
+  name                = "${local.service_name}-dyn-${each.key}-${local.environment_name}"
   location            = each.key
   resource_group_name = azurerm_resource_group.service.name
   kind                = "FunctionApp"
