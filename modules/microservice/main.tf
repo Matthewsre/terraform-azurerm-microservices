@@ -10,6 +10,8 @@ terraform {
 locals {
   microservice_environment_name = "${var.name}-${var.environment_name}"
   has_key_vault                 = true
+  keyvault_shorten              = length(local.microservice_environment_name) <= 24 ? 0 : length(local.microservice_environment_name) - 24
+  keyvault_name                 = sunbstr
   has_appservice                = var.appservice == "plan"
   appservice_plans              = local.has_appservice ? var.appservice_plans : {}
   has_function                  = var.function == "plan" || var.function == "consumption"
@@ -20,6 +22,11 @@ locals {
   has_http                      = var.http != null
   http_target                   = local.has_http ? var.http.target : local.has_appservice ? "appservice" : local.has_function ? "function" : null
   consumers                     = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
+
+  # 24 characters is used for max key vault name
+  max_name_length                      = 24
+  max_environment_differentiator_short = local.max_name_length - (length(var.name) + length(var.environment) + 2)
+  environment_differentiator_short     = local.max_environment_differentiator_short > 0 ? length(local.environment_differentiator) <= local.max_environment_differentiator_short ? local.environment_differentiator : substr(local.environment_differentiator, 0, local.max_environment_differentiator_short) : ""
 }
 
 ################################
@@ -66,7 +73,7 @@ resource "azurerm_user_assigned_identity" "microservice_cosmos" {
 resource "azurerm_key_vault" "microservice" {
   count = local.has_key_vault ? 1 : 0
 
-  name                        = local.microservice_environment_name
+  name                        = "${var.name}-${local.environment_differentiator_short}-${var.environment}"
   location                    = var.primary_region
   resource_group_name         = var.resource_group_name
   enabled_for_disk_encryption = true
@@ -244,7 +251,7 @@ locals {
       "FUNCTIONS_WORKER_RUNTIME" = "dotnet",
     },
     local.has_servicebus_queues ? {
-      "ServiceBusConnection" = "Endpoint=sb://${var.servicebus_namespaces[0]}.servicebus.windows.net/;"
+      "ServiceBusConnection" = "Endpoint=sb://${var.servicebus_namespaces[var.primary_region].name}.servicebus.windows.net/;"
       # Commenting out until User Assigned Identity is supported by Service Bus Functions
       # "ServiceBus:ManagedServiceAppId" = "Endpoint=sb://<NAMESPACE NAME>.servicebus.windows.net/;Authentication=Managed Identity${azurerm_user_assigned_identity.microservice_servicebus[0].client_id}"
     } : {}
