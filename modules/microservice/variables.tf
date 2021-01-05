@@ -14,6 +14,12 @@ variable "name" {
   description = "Name of the microservice"
 }
 
+variable "environment_differentiator" {
+  type        = string
+  description = "Value can be used to allow multiple envrionments."
+  default     = ""
+}
+
 variable "primary_region" {
   type        = string
   description = "Primary region used for shared resources. If not provided will use first value from 'regions'"
@@ -29,9 +35,18 @@ variable "retention_in_days" {
   description = "Days set for retention policies"
 }
 
+variable "environment" {
+  type        = string
+  description = "Terrform environment we're acting in"
+  validation {
+    condition     = contains(["dev", "tst", "ppe", "prd"], lower(var.environment))
+    error_message = "Environment must be 'dev', 'tst', 'ppe', or 'prd'."
+  }
+}
+
 variable "environment_name" {
   type        = string
-  description = "Name of the environment"
+  description = "Name of the environment including differentiator"
 }
 
 variable "roles" {

@@ -8,8 +8,8 @@ variable "environment" {
   type        = string
   description = "Terrform environment we're acting in"
   validation {
-    condition     = contains(["dev", "test", "ppe", "prod"], lower(var.environment))
-    error_message = "Environment must be 'dev', 'test', 'ppe', or 'prod'."
+    condition     = contains(["dev", "tst", "ppe", "prd"], lower(var.environment))
+    error_message = "Environment must be 'dev', 'tst', 'ppe', or 'prd'."
   }
 }
 

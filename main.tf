@@ -50,12 +50,15 @@ locals {
   sql_server_elastic_regions          = local.has_sql_server_elastic ? local.sql_server_regions : []
   admin_login                         = "${var.service_name}-admin"
 
-  # if this becomes a problem can standardize environments to be 3 char (dev, tst, ppe, prd)
   # 24 characters is used for max storage name
   max_storage_name_length              = 24
   max_region_length                    = reverse(sort([for region in var.regions : length(region)]))[0] # bug is preventing max() from working used sort and reverse instead
   max_environment_differentiator_short = local.max_storage_name_length - (length(local.service_name) + local.max_region_length + length(var.environment))
   environment_differentiator_short     = local.max_environment_differentiator_short > 0 ? length(local.environment_differentiator) <= local.max_environment_differentiator_short ? local.environment_differentiator : substr(local.environment_differentiator, 0, local.max_environment_differentiator_short) : ""
+
+  # 24 characters is used for max key vault name
+  max_environment_differentiator_short2 = local.max_storage_name_length - (length(local.service_name) + length(var.environment) + 2)
+  environment_differentiator_short2     = local.max_environment_differentiator_short2 > 0 ? length(local.environment_differentiator) <= local.max_environment_differentiator_short2 ? local.environment_differentiator : substr(local.environment_differentiator, 0, local.max_environment_differentiator_short2) : ""
 }
 
 # Getting current IP Address, only used for dev environment
@@ -139,7 +142,7 @@ resource "azurerm_cosmosdb_sql_database" "service" {
 }
 
 resource "azurerm_key_vault" "service" {
-  name                        = local.service_environment_name
+  name                        = "${local.service_name}-${local.environment_differentiator_short2}-${var.environment}"
   location                    = local.primary_region
   resource_group_name         = azurerm_resource_group.service.name
   enabled_for_disk_encryption = true
@@ -306,6 +309,8 @@ module "microservice" {
   for_each = { for microservice in var.microservices : microservice.name => microservice }
 
   name                            = each.value.name
+  environment                     = var.environment
+  environment_differentiator      = local.environment_differentiator
   appservice                      = each.value.appservice
   function                        = each.value.function
   sql                             = each.value.sql
