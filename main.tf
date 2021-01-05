@@ -323,6 +323,7 @@ module "microservice" {
   for_each = { for microservice in var.microservices : microservice.name => microservice }
 
   name                            = each.value.name
+  service_name                    = local.service_name
   environment                     = var.environment
   environment_differentiator      = local.environment_differentiator
   appservice                      = each.value.appservice

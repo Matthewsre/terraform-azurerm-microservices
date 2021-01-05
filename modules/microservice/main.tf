@@ -8,18 +8,19 @@ terraform {
 #########################
 
 locals {
-  microservice_environment_name = "${var.name}-${var.environment_name}"
-  has_key_vault                 = true
-  has_appservice                = var.appservice == "plan"
-  appservice_plans              = local.has_appservice ? var.appservice_plans : {}
-  has_function                  = var.function == "plan" || var.function == "consumption"
-  function_appservice_plans     = var.function == "plan" ? var.appservice_plans : var.function == "consumption" ? var.consumption_appservice_plans : {}
-  has_sql_database              = var.sql == "server" || var.sql == "elastic"
-  has_servicebus_queues         = var.queues != null && length(var.queues) > 0
-  has_cosmos_container          = length(var.cosmos_containers) > 0
-  has_http                      = var.http != null
-  http_target                   = local.has_http ? var.http.target : local.has_appservice ? "appservice" : local.has_function ? "function" : null
-  consumers                     = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
+  microservice_environment_name      = "${var.name}-${var.environment_name}"
+  full_microservice_environment_name = "${var.service_name}-${local.microservice_environment_name}"
+  has_key_vault                      = true
+  has_appservice                     = var.appservice == "plan"
+  appservice_plans                   = local.has_appservice ? var.appservice_plans : {}
+  has_function                       = var.function == "plan" || var.function == "consumption"
+  function_appservice_plans          = var.function == "plan" ? var.appservice_plans : var.function == "consumption" ? var.consumption_appservice_plans : {}
+  has_sql_database                   = var.sql == "server" || var.sql == "elastic"
+  has_servicebus_queues              = var.queues != null && length(var.queues) > 0
+  has_cosmos_container               = length(var.cosmos_containers) > 0
+  has_http                           = var.http != null
+  http_target                        = local.has_http ? var.http.target : local.has_appservice ? "appservice" : local.has_function ? "function" : null
+  consumers                          = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
 
   # 24 characters is used for max key vault name
   max_name_length                      = 24
@@ -129,16 +130,16 @@ resource "azurerm_servicebus_queue" "microservice" {
 ### AAD Application
 
 resource "azuread_application" "microservice" {
-  name                       = local.microservice_environment_name
+  name                       = local.full_microservice_environment_name
   prevent_duplicate_names    = true
   oauth2_allow_implicit_flow = true
-  identifier_uris            = [lower("https://${local.microservice_environment_name}.trafficmanager.net/")]
+  identifier_uris            = [lower("${local.full_microservice_environment_name}.trafficmanager.net/")]
   owners                     = [var.azurerm_client_config.object_id]
   group_membership_claims    = "None"
   oauth2_permissions         = []
   reply_urls = [
-    lower("https://${local.microservice_environment_name}.trafficmanager.net/"),
-    lower("https://${local.microservice_environment_name}.trafficmanager.net${var.callback_path}")
+    lower("https://${local.full_microservice_environment_name}.trafficmanager.net/"),
+    lower("https://${local.full_microservice_environment_name}.trafficmanager.net${var.callback_path}")
   ]
 }
 
