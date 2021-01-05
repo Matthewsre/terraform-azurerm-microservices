@@ -8,6 +8,11 @@ output "current_user" {
   value       = data.azuread_user.current_user
 }
 
+output "current_ip" {
+  description = "IP Address retrieved for simpilfying dev configurations. Will be null for non dev environments."
+  value       = local.is_dev ? data.external.current_ipv4[0].result.ip_address : null
+}
+
 output "locals" {
   description = "local values created base on input data"
   value = {

@@ -36,7 +36,7 @@ locals {
   service_name                        = lower(var.service_name)
   environment_name                    = local.is_dev ? "${local.environment_differentiator}-${var.environment}" : var.environment
   service_environment_name            = local.is_dev ? "${var.service_name}-${local.environment_differentiator}-${var.environment}" : "${var.service_name}-${var.environment}"
-  environment_differentiator          = var.environment_differentiator != "" ? var.environment_differentiator : local.is_dev && length(data.azuread_user.current_user) > 0 ? split(".", split("_", split("#EXT#", data.azuread_user.current_user[0].mail_nickname)[0])[0])[0] : ""
+  environment_differentiator          = var.environment_differentiator != "" ? var.environment_differentiator : local.is_dev && length(data.azuread_user.current_user) > 0 ? replace(split(".", split("_", split("#EXT#", data.azuread_user.current_user[0].mail_nickname)[0])[0])[0], "-", "") : ""
   has_cosmos                          = length({ for microservice in var.microservices : microservice.name => microservice if microservice.cosmos_containers != null ? length(microservice.cosmos_containers) > 0 : false }) > 0
   has_queues                          = length({ for microservice in var.microservices : microservice.name => microservice if microservice.queues != null ? length(microservice.queues) > 0 : false }) > 0
   has_sql_server_elastic              = length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "elastic" }) > 0
@@ -61,28 +61,37 @@ locals {
   environment_differentiator_short2     = local.max_environment_differentiator_short2 > 0 ? length(local.environment_differentiator) <= local.max_environment_differentiator_short2 ? local.environment_differentiator : substr(local.environment_differentiator, 0, local.max_environment_differentiator_short2) : ""
 }
 
-# Getting current IP Address, only used for dev environment
-# solution from here: https://stackoverflow.com/a/58959164/1362146
-data "http" "my_public_ip" {
+# Commenting out the external http request dependency in favor of powershell method for looking up IP
+# Leaving this in as it might be beneficial to offer different ip retrieval approaches depending on environment (will powershell be available?)
+
+# # Getting current IP Address, only used for dev environment
+# # solution from here: https://stackoverflow.com/a/58959164/1362146
+# data "http" "my_public_ip" {
+#   count = local.is_dev ? 1 : 0
+
+#   # url = "https://ifconfig.co/json"
+#   # request_headers = {
+#   #   Accept = "application/json"
+#   # }
+
+#   url = "https://ipinfo.io/ip"
+# }
+
+data "external" "current_ipv4" {
   count = local.is_dev ? 1 : 0
 
-  # url = "https://ifconfig.co/json"
-  # request_headers = {
-  #   Accept = "application/json"
-  # }
-
-  url = "https://ipinfo.io/ip"
+  program = ["Powershell.exe", "${path.module}/scripts/Get-CurrentIpV4.ps1"]
 }
 
 locals {
   # http_my_public_ip_response = jsondecode(data.http.my_public_ip[0].body)
   # current_ip                 = local.is_dev ? local.http_my_public_ip_response.ip : null
 
-  http_my_public_ip_response = chomp(data.http.my_public_ip[0].body)
-  current_ip                 = local.is_dev ? local.http_my_public_ip_response : null
+  # http_my_public_ip_response = chomp(data.http.my_public_ip[0].body)
+  # current_ip                 = local.is_dev ? local.http_my_public_ip_response : null
 
   # the current_ip is only retrieved and set for the dev environment to simplify developer workflow
-  key_vault_ip_rules = local.is_dev ? ["${local.current_ip}/32"] : null
+  key_vault_ip_rules = local.is_dev ? ["${data.external.current_ipv4[0].result.ip_address}/32"] : null
 }
 
 #################################
