@@ -13,6 +13,12 @@ variable "environment" {
   }
 }
 
+variable "ip_address" {
+  type        = string
+  description = "IP Address that will be used for dev environments to add to firewall rules"
+  default     = ""
+}
+
 variable "environment_differentiator" {
   type        = string
   description = "Value can be used to allow multiple envrionments. Logged in azure AD user mail_nickname will be used as default for dev environment unless specified."
