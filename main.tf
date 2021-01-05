@@ -78,7 +78,7 @@ locals {
 # }
 
 data "external" "current_ipv4" {
-  count = local.is_dev ? 1 : 0
+  count = local.is_dev && var.ip_address != "" ? 1 : 0
 
   program = ["Powershell.exe", "${path.module}/scripts/Get-CurrentIpV4.ps1"]
 }
@@ -91,7 +91,7 @@ locals {
   # current_ip                 = local.is_dev ? local.http_my_public_ip_response : null
 
   # the current_ip is only retrieved and set for the dev environment to simplify developer workflow
-  key_vault_ip_rules = local.is_dev ? ["${data.external.current_ipv4[0].result.ip_address}/32"] : null
+  key_vault_ip_rules = local.is_dev ? var.ip_address != "" ? ["${var.ip_address}/32"] : ["${data.external.current_ipv4[0].result.ip_address}/32"] : null
 }
 
 #################################
