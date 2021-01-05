@@ -66,15 +66,20 @@ locals {
 data "http" "my_public_ip" {
   count = local.is_dev ? 1 : 0
 
-  url = "https://ifconfig.co/json"
-  request_headers = {
-    Accept = "application/json"
-  }
+  # url = "https://ifconfig.co/json"
+  # request_headers = {
+  #   Accept = "application/json"
+  # }
+
+  url = "https://ipinfo.io/ip"
 }
 
 locals {
-  http_my_public_ip_response = jsondecode(data.http.my_public_ip[0].body)
-  current_ip                 = local.is_dev ? local.http_my_public_ip_response.ip : null
+  # http_my_public_ip_response = jsondecode(data.http.my_public_ip[0].body)
+  # current_ip                 = local.is_dev ? local.http_my_public_ip_response.ip : null
+
+  http_my_public_ip_response = chomp(data.http.my_public_ip[0].body)
+  current_ip                 = local.is_dev ? local.http_my_public_ip_response : null
 
   # the current_ip is only retrieved and set for the dev environment to simplify developer workflow
   key_vault_ip_rules = local.is_dev ? ["${local.current_ip}/32"] : null
