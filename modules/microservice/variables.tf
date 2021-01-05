@@ -14,6 +14,11 @@ variable "name" {
   description = "Name of the microservice"
 }
 
+variable "service_name" {
+  type        = string
+  description = "Name of the top level service for the microservice"
+}
+
 variable "environment_differentiator" {
   type        = string
   description = "Value can be used to allow multiple envrionments."
