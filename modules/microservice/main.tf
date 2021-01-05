@@ -10,8 +10,6 @@ terraform {
 locals {
   microservice_environment_name = "${var.name}-${var.environment_name}"
   has_key_vault                 = true
-  keyvault_shorten              = length(local.microservice_environment_name) <= 24 ? 0 : length(local.microservice_environment_name) - 24
-  keyvault_name                 = sunbstr
   has_appservice                = var.appservice == "plan"
   appservice_plans              = local.has_appservice ? var.appservice_plans : {}
   has_function                  = var.function == "plan" || var.function == "consumption"
@@ -26,7 +24,7 @@ locals {
   # 24 characters is used for max key vault name
   max_name_length                      = 24
   max_environment_differentiator_short = local.max_name_length - (length(var.name) + length(var.environment) + 2)
-  environment_differentiator_short     = local.max_environment_differentiator_short > 0 ? length(local.environment_differentiator) <= local.max_environment_differentiator_short ? local.environment_differentiator : substr(local.environment_differentiator, 0, local.max_environment_differentiator_short) : ""
+  environment_differentiator_short     = local.max_environment_differentiator_short > 0 ? length(var.environment_differentiator) <= local.max_environment_differentiator_short ? var.environment_differentiator : substr(var.environment_differentiator, 0, local.max_environment_differentiator_short) : ""
 }
 
 ################################
