@@ -306,7 +306,7 @@ locals {
 resource "azurerm_app_service_slot" "microservice" {
   for_each = { for slot in local.appservice_slots : "${slot.slot}-${slot.appservice.name}" => slot }
 
-  name                = "${each.value.appservice.name}-${each.value.slot}"
+  name                = each.value.slot
   app_service_name    = each.value.appservice.name
   location            = each.value.appservice.location
   resource_group_name = var.resource_group_name
@@ -360,7 +360,7 @@ locals {
   function_slots = local.has_function && length(var.appservice_deployment_slots) > 0 ? flatten([for slot in var.appservice_deployment_slots : [for appservice in local.function_appservice_plans : { slot = slot, appservice = appservice }]]) : []
   function_slots_map = { for slot in local.function_slots : "${slot.slot}-${slot.appservice.location}" =>
     {
-      slot_name         = "${azurerm_function_app.microservice[slot.appservice.location].name}-${slot.slot}"
+      slot_name         = slot.slot
       function_app_name = azurerm_function_app.microservice[slot.appservice.location].name
       location          = slot.appservice.location
       app_service_id    = slot.appservice.id
