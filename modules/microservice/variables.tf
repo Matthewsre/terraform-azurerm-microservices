@@ -109,16 +109,24 @@ variable "http" {
   default     = null
 }
 
-variable "sql_server_id" {
-  type        = string
-  description = "Server Id for SQL"
-  default     = ""
+variable "sql_servers" {
+  type = map(object({
+    id       = string
+    name     = string
+    location = string
+  }))
+  description = "SQL Servers to use"
+  default     = null
 }
 
-variable "sql_elastic_pool_id" {
-  type        = string
-  description = "Elastic pool Id for SQL"
-  default     = ""
+variable "sql_elastic_pools" {
+  type = map(object({
+    id       = string
+    name     = string
+    location = string
+  }))
+  description = "SQL Elastic Pools to use"
+  default     = null
 }
 
 variable "cosmos_containers" {
@@ -229,7 +237,13 @@ variable "key_vault_permissions" {
   })
 }
 
-variable "key_vault_ip_rules" {
-  description = "One or more IP Addresses, or CIDR Blocks which should be able to access the Key Vault"
-  type        = list(string)
+variable "key_vault_network_acls" {
+  description = "Defines the network acls for key vault"
+  type = object({
+    default_action             = string
+    bypass                     = string
+    ip_rules                   = optional(list(string))
+    virtual_network_subnet_ids = optional(list(string))
+  })
+  default = null
 }

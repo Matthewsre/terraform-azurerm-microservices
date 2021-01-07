@@ -50,6 +50,9 @@ locals {
   sql_server_elastic_regions          = local.has_sql_server_elastic ? local.sql_server_regions : []
   admin_login                         = "${var.service_name}-admin"
 
+  include_ip_address = var.key_vault_include_ip_address == null ? local.is_dev : var.key_vault_include_ip_address == true
+  lookup_ip_address  = local.include_ip_address && var.ip_address == ""
+
   # 24 characters is used for max storage name
   max_storage_name_length              = 24
   max_region_length                    = reverse(sort([for region in var.regions : length(region)]))[0] # bug is preventing max() from working used sort and reverse instead
@@ -78,7 +81,7 @@ locals {
 # }
 
 data "external" "current_ipv4" {
-  count = local.is_dev && var.ip_address != "" ? 1 : 0
+  count = local.lookup_ip_address ? 1 : 0
 
   program = ["Powershell.exe", "${path.module}/scripts/Get-CurrentIpV4.ps1"]
 }
@@ -91,7 +94,21 @@ locals {
   # current_ip                 = local.is_dev ? local.http_my_public_ip_response : null
 
   # the current_ip is only retrieved and set for the dev environment to simplify developer workflow
-  key_vault_ip_rules = local.is_dev ? var.ip_address != "" ? ["${var.ip_address}/32"] : ["${data.external.current_ipv4[0].result.ip_address}/32"] : null
+
+  #key_vault_ip_rules = local.is_dev ? var.ip_address != "" ? ["${var.ip_address}/32"] : ["${data.external.current_ipv4[0].result.ip_address}/32"] : null
+  external_ip_address = local.lookup_ip_address ? ["${data.external.current_ipv4[0].result.ip_address}/32"] : null
+  current_ip_address  = local.include_ip_address ? coalesce(local.external_ip_address, ["${var.ip_address}/32"]) : null
+  key_vault_network_acls = var.key_vault_network_acls == null && local.include_ip_address ? {
+    default_action             = "Deny"
+    bypass                     = "AzureServices"
+    ip_rules                   = local.current_ip_address
+    virtual_network_subnet_ids = null
+    } : {
+    default_action             = var.key_vault_network_acls.default_action
+    bypass                     = var.key_vault_network_acls.bypass
+    ip_rules                   = local.include_ip_address ? concat(coalesce(local.current_ip_address, []), coalesce(var.key_vault_network_acls.ip_rules, [])) : var.key_vault_network_acls.ip_rules
+    virtual_network_subnet_ids = var.key_vault_network_acls.virtual_network_subnet_ids
+  }
 }
 
 #################################
@@ -176,10 +193,15 @@ resource "azurerm_key_vault" "service" {
     storage_permissions     = var.key_vault_permissions.storage_permissions
   }
 
-  network_acls {
-    default_action = "Deny"
-    bypass         = "AzureServices"
-    ip_rules       = local.key_vault_ip_rules
+  dynamic "network_acls" {
+    for_each = local.key_vault_network_acls != null ? [local.key_vault_network_acls] : []
+
+    content {
+      default_action             = local.key_vault_network_acls.default_action
+      bypass                     = local.key_vault_network_acls.bypass
+      ip_rules                   = local.key_vault_network_acls.ip_rules
+      virtual_network_subnet_ids = local.key_vault_network_acls.virtual_network_subnet_ids
+    }
   }
 }
 
@@ -340,12 +362,12 @@ module "microservice" {
   environment_name                = local.environment_name
   callback_path                   = var.callback_path
   key_vault_permissions           = var.key_vault_permissions
-  key_vault_ip_rules              = local.key_vault_ip_rules
+  key_vault_network_acls          = local.key_vault_network_acls
   azurerm_client_config           = data.azurerm_client_config.current
   application_insights            = azurerm_application_insights.service
   storage_accounts                = azurerm_storage_account.service
-  sql_server_id                   = local.has_sql_server ? azurerm_mssql_server.service[local.primary_region].id : null
-  sql_elastic_pool_id             = local.has_sql_server_elastic ? azurerm_mssql_elasticpool.service[local.primary_region].id : null
+  sql_servers                     = local.has_sql_server ? azurerm_mssql_server.service : null
+  sql_elastic_pools               = local.has_sql_server_elastic ? azurerm_mssql_elasticpool.service : null
   cosmosdb_account_name           = local.has_cosmos ? azurerm_cosmosdb_account.service[0].name : null
   cosmosdb_sql_database_name      = local.has_cosmos ? azurerm_cosmosdb_sql_database.service[0].name : null
   cosmosdb_endpoint               = local.has_cosmos ? azurerm_cosmosdb_account.service[0].endpoint : null
@@ -356,9 +378,31 @@ module "microservice" {
   consumption_appservice_plans    = azurerm_app_service_plan.service_consumption
 
   depends_on = [
+    azurerm_storage_account.service,
+    azurerm_servicebus_namespace.service,
+    azurerm_cosmosdb_sql_database.service,
     azurerm_mssql_elasticpool.service,
     azurerm_app_service_plan.service,
     azurerm_app_service_plan.service_consumption
+  ]
+}
+
+# traffic module was moved to it's own module to reduce/prevent intermittent conflict errors between app services, app functions, slots, and traffic manager
+module "microservice_traffic" {
+  source   = "./modules/traffic"
+  for_each = module.microservice
+
+  name                = each.value.traffic_data.microservice_environment_name
+  resource_group_name = azurerm_resource_group.service.name
+  app_services        = each.value.app_services
+  function_apps       = each.value.function_apps
+  http_target         = each.value.traffic_data.http_target
+  # app_service_endpoint_resources  = each.value.traffic_data.app_service_endpoint_resources
+  # function_app_endpoint_resources = each.value.traffic_data.function_app_endpoint_resources
+  # azure_endpoint_resources        = each.value.traffic_data.azure_endpoint_resources
+
+  depends_on = [
+    module.microservice
   ]
 }
 
