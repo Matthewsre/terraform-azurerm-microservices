@@ -8,9 +8,14 @@ output "current_user" {
   value       = data.azuread_user.current_user
 }
 
-output "current_ip" {
-  description = "IP Address retrieved for simpilfying dev configurations. Will be null for non dev environments."
-  value       = local.is_dev ? data.external.current_ipv4[0].result.ip_address : null
+output "external_ip_address" {
+  description = "External IP Address retrieved for simpilfying dev configurations"
+  value       = local.external_ip_address
+}
+
+output "current_ip_address" {
+  description = "IP Address being used for simpilfying dev configurations"
+  value       = local.current_ip_address
 }
 
 output "locals" {

@@ -16,6 +16,8 @@ locals {
   has_function                       = var.function == "plan" || var.function == "consumption"
   function_appservice_plans          = var.function == "plan" ? var.appservice_plans : var.function == "consumption" ? var.consumption_appservice_plans : {}
   has_sql_database                   = var.sql == "server" || var.sql == "elastic"
+  has_primary_sql_server             = local.has_sql_database && contains(keys(var.sql_servers), var.primary_region)
+  has_secondary_sql_server           = local.has_sql_database && contains(keys(var.sql_servers), var.secondary_region)
   has_servicebus_queues              = var.queues != null && length(var.queues) > 0
   has_cosmos_container               = length(var.cosmos_containers) > 0
   has_http                           = var.http != null
@@ -26,6 +28,27 @@ locals {
   max_name_length                      = 24
   max_environment_differentiator_short = local.max_name_length - (length(var.name) + length(var.environment) + 2)
   environment_differentiator_short     = local.max_environment_differentiator_short > 0 ? length(var.environment_differentiator) <= local.max_environment_differentiator_short ? var.environment_differentiator : substr(var.environment_differentiator, 0, local.max_environment_differentiator_short) : ""
+
+  key_vaul_access_policies = [
+    {
+      tenant_id = var.azurerm_client_config.tenant_id
+      object_id = var.azurerm_client_config.object_id
+
+      certificate_permissions = var.key_vault_permissions.certificate_permissions
+      key_permissions         = var.key_vault_permissions.key_permissions
+      secret_permissions      = var.key_vault_permissions.secret_permissions
+      storage_permissions     = var.key_vault_permissions.storage_permissions
+    },
+    {
+      tenant_id = var.azurerm_client_config.tenant_id
+      object_id = azurerm_user_assigned_identity.microservice_key_vault[0].principal_id
+
+      key_permissions     = ["get"]
+      secret_permissions  = ["get"]
+      secret_permissions  = null
+      storage_permissions = null
+    }
+  ]
 }
 
 ################################
@@ -92,28 +115,59 @@ resource "azurerm_key_vault" "microservice" {
     storage_permissions     = var.key_vault_permissions.storage_permissions
   }
 
-  network_acls {
-    default_action = "Deny"
-    bypass         = "AzureServices"
-    ip_rules       = var.key_vault_ip_rules
+  access_policy {
+    tenant_id = var.azurerm_client_config.tenant_id
+    object_id = azurerm_user_assigned_identity.microservice_key_vault[0].principal_id
+
+    key_permissions    = ["get"]
+    secret_permissions = ["get"]
+  }
+
+  # access_policy {
+  #   tenant_id = var.azurerm_client_config.tenant_id
+  #   object_id = var.azurerm_client_config.object_id
+
+  #   certificate_permissions = var.key_vault_permissions.certificate_permissions
+  #   key_permissions         = var.key_vault_permissions.key_permissions
+  #   secret_permissions      = var.key_vault_permissions.secret_permissions
+  #   storage_permissions     = var.key_vault_permissions.storage_permissions
+  # }
+
+  dynamic "network_acls" {
+    for_each = var.key_vault_network_acls != null ? [var.key_vault_network_acls] : []
+
+    content {
+      default_action             = var.key_vault_network_acls.default_action
+      bypass                     = var.key_vault_network_acls.bypass
+      ip_rules                   = var.key_vault_network_acls.ip_rules
+      virtual_network_subnet_ids = var.key_vault_network_acls.virtual_network_subnet_ids
+    }
   }
 }
 
-resource "azurerm_key_vault_access_policy" "microservice" {
-  count = local.has_key_vault ? 1 : 0
+# resource "azurerm_key_vault_access_policy" "microservice" {
+#   count = local.has_key_vault ? 1 : 0
 
-  key_vault_id = azurerm_key_vault.microservice[0].id
-  tenant_id    = var.azurerm_client_config.tenant_id
-  object_id    = azurerm_user_assigned_identity.microservice_key_vault[0].principal_id
+#   key_vault_id = azurerm_key_vault.microservice[0].id
+#   tenant_id    = var.azurerm_client_config.tenant_id
+#   object_id    = var.azurerm_client_config.object_id
 
-  key_permissions = [
-    "get",
-  ]
+#   certificate_permissions = var.key_vault_permissions.certificate_permissions
+#   key_permissions         = var.key_vault_permissions.key_permissions
+#   secret_permissions      = var.key_vault_permissions.secret_permissions
+#   storage_permissions     = var.key_vault_permissions.storage_permissions
+# }
 
-  secret_permissions = [
-    "get",
-  ]
-}
+# resource "azurerm_key_vault_access_policy" "microservice_identity" {
+#   count = local.has_key_vault ? 1 : 0
+
+#   key_vault_id = azurerm_key_vault.microservice[0].id
+#   tenant_id    = var.azurerm_client_config.tenant_id
+#   object_id    = azurerm_user_assigned_identity.microservice_key_vault[0].principal_id
+
+#   key_permissions    = ["get"]
+#   secret_permissions = ["get"]
+# }
 
 locals {
   queues = local.has_servicebus_queues ? flatten([for queue in var.queues : [for namespace in var.servicebus_namespaces : { queue = queue, namespace = namespace }]]) : []
@@ -161,14 +215,13 @@ resource "azuread_application_app_role" "microservice" {
 
 ### SQL Database
 
-resource "azurerm_mssql_database" "microservice" {
-  count = local.has_sql_database ? 1 : 0
+resource "azurerm_mssql_database" "microservice_primary" {
+  count = local.has_primary_sql_server ? 1 : 0
 
   name            = local.microservice_environment_name
-  server_id       = var.sql_server_id
-  elastic_pool_id = var.sql == "elastic" ? var.sql_elastic_pool_id : null
+  server_id       = var.sql_servers[var.primary_region].id
+  elastic_pool_id = var.sql == "elastic" ? var.sql_elastic_pools[var.primary_region].id : null
   collation       = "SQL_Latin1_General_CP1_CI_AS"
-  license_type    = "LicenseIncluded"
   sku_name        = var.sql == "elastic" ? "ElasticPool" : "BC_Gen5_2"
 
   #max_size_gb     = 4
@@ -180,6 +233,16 @@ resource "azurerm_mssql_database" "microservice" {
     storage_account_access_key_is_secondary = false
     retention_in_days                       = var.retention_in_days
   }
+}
+
+resource "azurerm_mssql_database" "microservice_secondary" {
+  count = local.has_secondary_sql_server ? 1 : 0
+
+  name                        = local.microservice_environment_name
+  server_id                   = var.sql_servers[var.secondary_region].id
+  elastic_pool_id             = var.sql == "elastic" ? var.sql_elastic_pools[var.secondary_region].id : null
+  create_mode                 = "Secondary"
+  creation_source_database_id = azurerm_mssql_database.microservice_primary[0].id
 }
 
 #Commenting this out and moving it to azurerm_mssql_database to avoid identity configuration issue from being created separately
@@ -250,20 +313,32 @@ locals {
       "FUNCTIONS_WORKER_RUNTIME" = "dotnet",
     },
     local.has_servicebus_queues ? {
-      "ServiceBusConnection" = "Endpoint=sb://${var.servicebus_namespaces[var.primary_region].name}.servicebus.windows.net/;"
-      # Commenting out until User Assigned Identity is supported by Service Bus Functions
-      # "ServiceBus:ManagedServiceAppId" = "Endpoint=sb://<NAMESPACE NAME>.servicebus.windows.net/;Authentication=Managed Identity${azurerm_user_assigned_identity.microservice_servicebus[0].client_id}"
+      # Currently system assigned identity is supported, but not user assigned identity
+      "ServiceBusConnection" = "Endpoint=sb://${var.servicebus_namespaces[var.primary_region].name}.servicebus.windows.net/;Authentication=Managed Identity"
     } : {}
   )
 }
 
+
+
 locals {
   user_assigned_identities = concat(
-    local.has_key_vault ? [azurerm_user_assigned_identity.microservice_key_vault[0].id] : [],
-    local.has_sql_database ? [azurerm_user_assigned_identity.microservice_sql[0].id] : [],
-    local.has_servicebus_queues ? [azurerm_user_assigned_identity.microservice_servicebus[0].id] : [],
-    local.has_cosmos_container ? [azurerm_user_assigned_identity.microservice_cosmos[0].id] : []
+    local.has_key_vault ? [azurerm_user_assigned_identity.microservice_key_vault[0]] : [],
+    local.has_sql_database ? [azurerm_user_assigned_identity.microservice_sql[0]] : [],
+    local.has_servicebus_queues ? [azurerm_user_assigned_identity.microservice_servicebus[0]] : [],
+    local.has_cosmos_container ? [azurerm_user_assigned_identity.microservice_cosmos[0]] : []
   )
+  has_user_assigned_identities = length(local.user_assigned_identities) > 0
+  appservice_identity_type     = local.has_user_assigned_identities ? "SystemAssigned, UserAssigned" : "SystemAssigned"
+
+  # fix #1 - for case sensitivity issue related to azurerm_user_assigned_identity resource to avoid detecting changes
+  # strings wrapped in forward slash are treated as regex, hence the "//resourcegroups//"
+  # 
+  # fix #2 - for sorting the values since they will show up as changes if not
+  # sorting didn't work for all scenarios and the result order is seemingly random added more details to this open bug:
+  # https://github.com/terraform-providers/terraform-provider-azurerm/issues/7350#issuecomment-755834882
+
+  user_assigned_identity_ids = local.has_user_assigned_identities ? sort([for identity in local.user_assigned_identities : replace(identity.id, "//resourceGroups//", "/resourcegroups/")]) : null
 }
 
 resource "azurerm_app_service" "microservice" {
@@ -286,17 +361,9 @@ resource "azurerm_app_service" "microservice" {
 
   app_settings = local.appservice_app_settings
 
-  #   storage_account {
-  #     name       = var.storage_accounts[each.value.location].name
-  #     access_key = var.storage_accounts[each.value.location].primary_access_key
-  #   }
-
-  dynamic "identity" {
-    for_each = length(local.user_assigned_identities) > 0 ? [local.user_assigned_identities] : []
-    content {
-      type         = "UserAssigned"
-      identity_ids = local.user_assigned_identities
-    }
+  identity {
+    type         = local.appservice_identity_type
+    identity_ids = local.user_assigned_identity_ids
   }
 }
 
@@ -304,33 +371,9 @@ locals {
   appservice_slots = local.has_appservice ? flatten([for slot in var.appservice_deployment_slots : [for appservice in azurerm_app_service.microservice : { slot = slot, appservice = appservice }]]) : []
 }
 
-resource "azurerm_app_service_slot" "microservice" {
-  for_each = { for slot in local.appservice_slots : "${slot.slot}-${slot.appservice.name}" => slot }
-
-  name                = each.value.slot
-  app_service_name    = each.value.appservice.name
-  location            = each.value.appservice.location
-  resource_group_name = var.resource_group_name
-  app_service_plan_id = each.value.appservice.app_service_plan_id
-
-  app_settings = each.value.appservice.app_settings
-
-  site_config {
-    dotnet_framework_version = each.value.appservice.site_config[0].dotnet_framework_version
-    http2_enabled            = each.value.appservice.site_config[0].http2_enabled
-    websockets_enabled       = each.value.appservice.site_config[0].websockets_enabled
-    always_on                = each.value.appservice.site_config[0].always_on
-  }
-
-  depends_on = [
-    azurerm_app_service.microservice
-  ]
-}
-
 ### Function
 
 resource "azurerm_function_app" "microservice" {
-
   for_each = local.function_appservice_plans
 
   resource_group_name        = var.resource_group_name
@@ -352,8 +395,8 @@ resource "azurerm_function_app" "microservice" {
   app_settings = merge(local.appservice_app_settings, local.appservice_function_app_settings)
 
   identity {
-    type         = "UserAssigned"
-    identity_ids = local.user_assigned_identities
+    type         = local.appservice_identity_type
+    identity_ids = local.user_assigned_identity_ids
   }
 }
 
@@ -368,6 +411,42 @@ locals {
     }
     if slot.slot != null && slot.slot != ""
   }
+}
+
+# Slots
+
+resource "time_sleep" "delay_before_creating_slots" {
+  depends_on = [
+    azurerm_app_service.microservice,
+    azurerm_function_app.microservice
+  ]
+
+  create_duration  = "15s"
+  destroy_duration = "15s"
+}
+
+resource "azurerm_app_service_slot" "microservice" {
+  for_each = { for slot in local.appservice_slots : "${slot.slot}-${slot.appservice.name}" => slot }
+
+  name                = each.value.slot
+  app_service_name    = each.value.appservice.name
+  location            = each.value.appservice.location
+  resource_group_name = var.resource_group_name
+  app_service_plan_id = each.value.appservice.app_service_plan_id
+
+  app_settings = each.value.appservice.app_settings
+
+  site_config {
+    dotnet_framework_version = each.value.appservice.site_config[0].dotnet_framework_version
+    http2_enabled            = each.value.appservice.site_config[0].http2_enabled
+    websockets_enabled       = each.value.appservice.site_config[0].websockets_enabled
+    always_on                = each.value.appservice.site_config[0].always_on
+  }
+
+  depends_on = [
+    azurerm_app_service.microservice,
+    time_sleep.delay_before_creating_slots
+  ]
 }
 
 resource "azurerm_function_app_slot" "microservice" {
@@ -390,60 +469,17 @@ resource "azurerm_function_app_slot" "microservice" {
   }
 
   depends_on = [
-    azurerm_function_app.microservice
+    azurerm_function_app.microservice,
+    time_sleep.delay_before_creating_slots
   ]
 }
 
 ### Traffic Manager
 
-resource "azurerm_traffic_manager_profile" "microservice" {
-  name                   = local.microservice_environment_name
-  resource_group_name    = var.resource_group_name
-  traffic_routing_method = "Performance"
+# preparing data to be processed by a separate module to reduce conflicts between app service configurations and traffic manager
 
-  dns_config {
-    relative_name = local.microservice_environment_name
-    ttl           = 60
-  }
-
-  monitor_config {
-    protocol                     = "https"
-    port                         = 443
-    path                         = "/"
-    interval_in_seconds          = 30
-    timeout_in_seconds           = 10
-    tolerated_number_of_failures = 3
-  }
-}
-
-resource "azurerm_traffic_manager_endpoint" "microservice_appservice" {
-  for_each = local.http_target == "appservice" ? azurerm_app_service.microservice : {}
-
-  name                = each.value.location
-  resource_group_name = var.resource_group_name
-  profile_name        = azurerm_traffic_manager_profile.microservice.name
-  type                = "azureEndpoints"
-  target_resource_id  = each.value.id
-
-  # traffic manager can cause conflict errors if running in parallel with slot creation
-  depends_on = [
-    azurerm_app_service_slot.microservice,
-    azurerm_function_app_slot.microservice
-  ]
-}
-
-resource "azurerm_traffic_manager_endpoint" "microservice_function" {
-  for_each = local.http_target == "function" ? azurerm_function_app.microservice : {}
-
-  name                = each.value.location
-  resource_group_name = var.resource_group_name
-  profile_name        = azurerm_traffic_manager_profile.microservice.name
-  type                = "azureEndpoints"
-  target_resource_id  = each.value.id
-
-  # traffic manager can cause conflict errors if running in parallel with slot creation
-  depends_on = [
-    azurerm_app_service_slot.microservice,
-    azurerm_function_app_slot.microservice
-  ]
+locals {
+  app_service_endpoint_resources  = local.http_target == "appservice" ? { for appservice in azurerm_app_service.microservice : appservice.location => { id = appservice.id, location = appservice.location } } : {}
+  function_app_endpoint_resources = local.http_target == "function" ? { for function in azurerm_function_app.microservice : function.location => { id = function.id, location = function.location } } : {}
+  azure_endpoint_resources        = merge(local.app_service_endpoint_resources, local.function_app_endpoint_resources)
 }

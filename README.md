@@ -31,6 +31,12 @@ Additional Configurations:
 
 ## Usage
 
+For large services there are sometimes conflict issues between app service slots, function app slots, and traffic manager. To avoid these issues until this can be resolved you can run apply with the `-parallelism=1` argument
+
+```
+terraform apply -parallelism=1 "dev.tfplan"
+```
+
 ```hcl
 
 module "microservice" {
