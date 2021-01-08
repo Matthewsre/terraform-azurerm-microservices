@@ -8,7 +8,8 @@ provider "azurerm" {
   skip_provider_registration = true
   features {
     key_vault {
-      purge_soft_delete_on_destroy = true
+      recover_soft_deleted_key_vaults = true
+      purge_soft_delete_on_destroy    = true
     }
   }
 }
@@ -98,17 +99,17 @@ locals {
   #key_vault_ip_rules = local.is_dev ? var.ip_address != "" ? ["${var.ip_address}/32"] : ["${data.external.current_ipv4[0].result.ip_address}/32"] : null
   external_ip_address = local.lookup_ip_address ? ["${data.external.current_ipv4[0].result.ip_address}/32"] : null
   current_ip_address  = local.include_ip_address ? coalesce(local.external_ip_address, ["${var.ip_address}/32"]) : null
-  key_vault_network_acls = var.key_vault_network_acls == null && local.include_ip_address ? {
-    default_action             = "Deny"
-    bypass                     = "AzureServices"
-    ip_rules                   = local.current_ip_address
-    virtual_network_subnet_ids = null
-    } : {
+  key_vault_network_acls = var.key_vault_network_acls != null ? {
     default_action             = var.key_vault_network_acls.default_action
     bypass                     = var.key_vault_network_acls.bypass
     ip_rules                   = local.include_ip_address ? concat(coalesce(local.current_ip_address, []), coalesce(var.key_vault_network_acls.ip_rules, [])) : var.key_vault_network_acls.ip_rules
     virtual_network_subnet_ids = var.key_vault_network_acls.virtual_network_subnet_ids
-  }
+    } : local.include_ip_address ? {
+    default_action             = "Deny"
+    bypass                     = "AzureServices"
+    ip_rules                   = local.current_ip_address
+    virtual_network_subnet_ids = null
+  } : null
 }
 
 #################################

@@ -16,8 +16,8 @@ locals {
   has_function                       = var.function == "plan" || var.function == "consumption"
   function_appservice_plans          = var.function == "plan" ? var.appservice_plans : var.function == "consumption" ? var.consumption_appservice_plans : {}
   has_sql_database                   = var.sql == "server" || var.sql == "elastic"
-  has_primary_sql_server             = local.has_sql_database && contains(keys(var.sql_servers), var.primary_region)
-  has_secondary_sql_server           = local.has_sql_database && contains(keys(var.sql_servers), var.secondary_region)
+  has_primary_sql_server             = local.has_sql_database ? contains(keys(var.sql_servers), var.primary_region) : false
+  has_secondary_sql_server           = local.has_sql_database ? contains(keys(var.sql_servers), var.secondary_region) : false
   has_servicebus_queues              = var.queues != null && length(var.queues) > 0
   has_cosmos_container               = length(var.cosmos_containers) > 0
   has_http                           = var.http != null
