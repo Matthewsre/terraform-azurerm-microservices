@@ -371,29 +371,6 @@ locals {
   appservice_slots = local.has_appservice ? flatten([for slot in var.appservice_deployment_slots : [for appservice in azurerm_app_service.microservice : { slot = slot, appservice = appservice }]]) : []
 }
 
-resource "azurerm_app_service_slot" "microservice" {
-  for_each = { for slot in local.appservice_slots : "${slot.slot}-${slot.appservice.name}" => slot }
-
-  name                = each.value.slot
-  app_service_name    = each.value.appservice.name
-  location            = each.value.appservice.location
-  resource_group_name = var.resource_group_name
-  app_service_plan_id = each.value.appservice.app_service_plan_id
-
-  app_settings = each.value.appservice.app_settings
-
-  site_config {
-    dotnet_framework_version = each.value.appservice.site_config[0].dotnet_framework_version
-    http2_enabled            = each.value.appservice.site_config[0].http2_enabled
-    websockets_enabled       = each.value.appservice.site_config[0].websockets_enabled
-    always_on                = each.value.appservice.site_config[0].always_on
-  }
-
-  depends_on = [
-    azurerm_app_service.microservice
-  ]
-}
-
 ### Function
 
 resource "azurerm_function_app" "microservice" {
@@ -436,6 +413,42 @@ locals {
   }
 }
 
+# Slots
+
+resource "time_sleep" "delay_before_creating_slots" {
+  depends_on = [
+    azurerm_app_service.microservice,
+    azurerm_function_app.microservice
+  ]
+
+  create_duration  = "15s"
+  destroy_duration = "15s"
+}
+
+resource "azurerm_app_service_slot" "microservice" {
+  for_each = { for slot in local.appservice_slots : "${slot.slot}-${slot.appservice.name}" => slot }
+
+  name                = each.value.slot
+  app_service_name    = each.value.appservice.name
+  location            = each.value.appservice.location
+  resource_group_name = var.resource_group_name
+  app_service_plan_id = each.value.appservice.app_service_plan_id
+
+  app_settings = each.value.appservice.app_settings
+
+  site_config {
+    dotnet_framework_version = each.value.appservice.site_config[0].dotnet_framework_version
+    http2_enabled            = each.value.appservice.site_config[0].http2_enabled
+    websockets_enabled       = each.value.appservice.site_config[0].websockets_enabled
+    always_on                = each.value.appservice.site_config[0].always_on
+  }
+
+  depends_on = [
+    azurerm_app_service.microservice,
+    time_sleep.delay_before_creating_slots
+  ]
+}
+
 resource "azurerm_function_app_slot" "microservice" {
   for_each = local.function_slots_map
 
@@ -456,7 +469,8 @@ resource "azurerm_function_app_slot" "microservice" {
   }
 
   depends_on = [
-    azurerm_function_app.microservice
+    azurerm_function_app.microservice,
+    time_sleep.delay_before_creating_slots
   ]
 }
 
@@ -465,85 +479,7 @@ resource "azurerm_function_app_slot" "microservice" {
 # preparing data to be processed by a separate module to reduce conflicts between app service configurations and traffic manager
 
 locals {
-  # app_service_endpoint_resources  = local.http_target == "appservice" ? { for appservice in azurerm_app_service.microservice : appservice.id => { id = appservice.id, location = appservice.location } } : {}
-  # function_app_endpoint_resources = local.http_target == "function" ? { for function in azurerm_function_app.microservice : function.id => { id = function.id, location = function.location } } : {}
-  # azure_endpoit_resources         = merge(app_service_endpoint_resources, function_app_endpoint_resources)
-
-  app_service_endpoint_resources  = local.http_target == "appservice" ? [for appservice in azurerm_app_service.microservice : { id = appservice.id, location = appservice.location }] : []
-  function_app_endpoint_resources = local.http_target == "function" ? [for function in azurerm_function_app.microservice : { id = function.id, location = function.location }] : []
-  azure_endpoint_resources        = concat(local.app_service_endpoint_resources, local.function_app_endpoint_resources)
+  app_service_endpoint_resources  = local.http_target == "appservice" ? { for appservice in azurerm_app_service.microservice : appservice.location => { id = appservice.id, location = appservice.location } } : {}
+  function_app_endpoint_resources = local.http_target == "function" ? { for function in azurerm_function_app.microservice : function.location => { id = function.id, location = function.location } } : {}
+  azure_endpoint_resources        = merge(local.app_service_endpoint_resources, local.function_app_endpoint_resources)
 }
-
-# output "traffic_data" {
-#   description = "Data that can be used to setup traffic routing"
-#   value = {
-#     microservice_environment_name = local.microservice_environment_name
-#     azure_endpoint_resources      = azure_endpoit_resources
-#   }
-# }
-
-# resource "azurerm_traffic_manager_profile" "microservice" {
-#   name                   = local.microservice_environment_name
-#   resource_group_name    = var.resource_group_name
-#   traffic_routing_method = "Performance"
-
-#   dns_config {
-#     relative_name = local.microservice_environment_name
-#     ttl           = 60
-#   }
-
-#   monitor_config {
-#     protocol                     = "https"
-#     port                         = 443
-#     path                         = "/"
-#     interval_in_seconds          = 30
-#     timeout_in_seconds           = 10
-#     tolerated_number_of_failures = 3
-#   }
-
-#   # traffic manager can cause conflict errors if running in parallel with slot creation
-#   depends_on = [
-#     azurerm_app_service.microservice,
-#     azurerm_function_app.microservice,
-#     azurerm_app_service_slot.microservice,
-#     azurerm_function_app_slot.microservice
-#   ]
-# }
-
-# resource "azurerm_traffic_manager_endpoint" "microservice_appservice" {
-#   for_each = local.http_target == "appservice" ? azurerm_app_service.microservice : {}
-
-#   name                = each.value.location
-#   resource_group_name = var.resource_group_name
-#   profile_name        = azurerm_traffic_manager_profile.microservice.name
-#   type                = "azureEndpoints"
-#   target_resource_id  = each.value.id
-
-#   # traffic manager can cause conflict errors if running in parallel with slot creation
-#   depends_on = [
-#     azurerm_traffic_manager_profile.microservice,
-#     azurerm_app_service.microservice,
-#     azurerm_function_app.microservice,
-#     azurerm_app_service_slot.microservice,
-#     azurerm_function_app_slot.microservice
-#   ]
-# }
-
-# resource "azurerm_traffic_manager_endpoint" "microservice_function" {
-#   for_each = local.http_target == "function" ? { for function in azurerm_function_app.microservice : function.id => { id = function.id, location = function.location } } : {}
-
-#   name                = each.value.location
-#   resource_group_name = var.resource_group_name
-#   profile_name        = azurerm_traffic_manager_profile.microservice.name
-#   type                = "azureEndpoints"
-#   target_resource_id  = each.value.id
-
-#   # traffic manager can cause conflict errors if running in parallel with slot creation
-#   depends_on = [
-#     azurerm_traffic_manager_profile.microservice,
-#     azurerm_app_service.microservice,
-#     azurerm_function_app.microservice,
-#     azurerm_app_service_slot.microservice,
-#     azurerm_function_app_slot.microservice
-#   ]
-# }

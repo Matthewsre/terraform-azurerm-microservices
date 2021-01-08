@@ -35,5 +35,4 @@ output "locals" {
 output "microservices" {
   description = "Details from microservice creation."
   value       = module.microservice
-  sensitive   = true
 }

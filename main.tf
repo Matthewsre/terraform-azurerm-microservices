@@ -236,8 +236,13 @@ resource "azurerm_servicebus_namespace" "service" {
 #### SQL Server
 
 resource "random_password" "sql_admin_password" {
-  length  = 16
-  special = false
+  length           = 32
+  min_special      = 1
+  min_numeric      = 1
+  min_upper        = 2
+  min_lower        = 2
+  special          = true
+  override_special = "!#%_-"
 }
 
 resource "azurerm_key_vault_secret" "sql_admin_login" {
@@ -387,22 +392,27 @@ module "microservice" {
   ]
 }
 
+resource "time_sleep" "delay_before_traffic" {
+  depends_on = [
+    module.microservice
+  ]
+
+  create_duration  = "15s"
+  destroy_duration = "15s"
+}
+
 # traffic module was moved to it's own module to reduce/prevent intermittent conflict errors between app services, app functions, slots, and traffic manager
 module "microservice_traffic" {
   source   = "./modules/traffic"
   for_each = module.microservice
 
-  name                = each.value.traffic_data.microservice_environment_name
-  resource_group_name = azurerm_resource_group.service.name
-  app_services        = each.value.app_services
-  function_apps       = each.value.function_apps
-  http_target         = each.value.traffic_data.http_target
-  # app_service_endpoint_resources  = each.value.traffic_data.app_service_endpoint_resources
-  # function_app_endpoint_resources = each.value.traffic_data.function_app_endpoint_resources
-  # azure_endpoint_resources        = each.value.traffic_data.azure_endpoint_resources
+  name                     = each.value.traffic_data.microservice_environment_name
+  resource_group_name      = azurerm_resource_group.service.name
+  azure_endpoint_resources = each.value.traffic_data.azure_endpoint_resources
 
   depends_on = [
-    module.microservice
+    module.microservice,
+    time_sleep.delay_before_traffic
   ]
 }
 
