@@ -4,8 +4,16 @@ output "name" {
 }
 
 output "database_id" {
-  description = "SQL database id that was created"
-  value       = local.has_sql_database ? azurerm_mssql_database.microservice[0].id : null
+  description = "SQL primary database id that was created"
+  value       = local.has_sql_database ? azurerm_mssql_database.microservice_primary[0].id : null
+}
+
+output "traffic_data" {
+  description = "Data that can be used to setup traffic routing"
+  value = {
+    microservice_environment_name = local.microservice_environment_name
+    azure_endpoint_resources      = local.azure_endpoint_resources
+  }
 }
 
 output "application_data" {

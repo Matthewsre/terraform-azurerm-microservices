@@ -147,6 +147,23 @@ variable "storage_account_replication_type" {
   default     = "RAGRS"
 }
 
+variable "key_vault_include_ip_address" {
+  description = "Defines if the current ip should be included in the default network acls for key vaults"
+  type        = bool
+  default     = null
+}
+
+variable "key_vault_network_acls" {
+  description = "Defines the default network acls for key vaults"
+  type = object({
+    default_action             = string
+    bypass                     = string
+    ip_rules                   = optional(list(string))
+    virtual_network_subnet_ids = optional(list(string))
+  })
+  default = null
+}
+
 variable "key_vault_permissions" {
   description = "Permissions applied to Key Vault for the provisioning account"
   type = object({
