@@ -174,7 +174,7 @@ resource "azurerm_cosmosdb_sql_database" "service" {
 }
 
 resource "azurerm_key_vault" "service" {
-  name                        = "${local.service_name}-${local.environment_differentiator_short2}-${var.environment}"
+  name                        = local.environment_differentiator_short2 != "" ? "${local.service_name}-${local.environment_differentiator_short2}-${var.environment}" : "${local.service_name}-${var.environment}"
   location                    = local.primary_region
   resource_group_name         = azurerm_resource_group.service.name
   enabled_for_disk_encryption = true
@@ -237,6 +237,7 @@ resource "azurerm_servicebus_namespace" "service" {
 #### SQL Server
 
 resource "random_password" "sql_admin_password" {
+  count            = local.has_sql_server ? 1 : 0
   length           = 32
   min_special      = 1
   min_numeric      = 1
@@ -256,7 +257,7 @@ resource "azurerm_key_vault_secret" "sql_admin_login" {
 resource "azurerm_key_vault_secret" "sql_admin_password" {
   count        = local.has_sql_server ? 1 : 0
   name         = "sql-admin-password"
-  value        = random_password.sql_admin_password.result
+  value        = random_password.sql_admin_password[0].result
   key_vault_id = azurerm_key_vault.service.id
 }
 
