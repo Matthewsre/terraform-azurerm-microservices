@@ -1,12 +1,12 @@
 variable "use_msi_to_authenticate" {
-  type        = bool
   description = "Use a managed service identity to authenticate"
+  type        = bool
   default     = false
 }
 
 variable "environment" {
-  type        = string
   description = "Terrform environment we're acting in"
+  type        = string
   validation {
     condition     = contains(["dev", "tst", "ppe", "prd"], lower(var.environment))
     error_message = "Environment must be 'dev', 'tst', 'ppe', or 'prd'."
@@ -14,43 +14,44 @@ variable "environment" {
 }
 
 variable "ip_address" {
-  type        = string
   description = "IP Address that will be used for dev environments to add to firewall rules"
+  type        = string
   default     = ""
 }
 
 variable "environment_differentiator" {
-  type        = string
   description = "Value can be used to allow multiple envrionments. Logged in azure AD user mail_nickname will be used as default for dev environment unless specified."
+  type        = string
   default     = ""
 }
 
 variable "enable_backups" {
-  type        = bool
   description = "Enable backups for the environment"
+  type        = bool
   default     = false
 }
 
 variable "retention_in_days" {
-  type        = number
   description = "Global retention policy set. (SQL Server, Application Insights, KeyVault Soft Delete, SQL Database)"
+  type        = number
   default     = 90
 }
 
 variable "service_name" {
-  type        = string
   description = "Name of microservice"
+  type        = string
 }
 
 variable "callback_path" {
-  type        = string
   description = "Callback path for authorization"
+  type        = string
   default     = "/signin-oidc"
 }
 
 # opened bug for lists with optional values https://github.com/hashicorp/terraform/issues/27374
 # this impacts cosmos_containers.max_throughput
 variable "microservices" {
+  description = "This will describe your microservices to determine which resources are needed"
   type = list(object({
     name       = string
     appservice = optional(string)
@@ -74,20 +75,20 @@ variable "microservices" {
 }
 
 variable "primary_region" {
-  type        = string
   description = "Primary region used for shared resources. If not provided will use first value from 'regions'"
+  type        = string
   default     = ""
 }
 
 variable "secondary_region" {
-  type        = string
   description = "Secondary region used for shared resources. If not provided will use second value from 'regions'"
+  type        = string
   default     = ""
 }
 
 variable "regions" {
-  type        = list(string)
   description = "Azure regions the service is located in"
+  type        = list(string)
   validation {
     condition     = length(var.regions) > 0
     error_message = "Must provide at least 1 region to deploy."
@@ -137,8 +138,8 @@ variable "cosmos_consistency_level" {
 }
 
 variable "cosmos_autoscale_max_throughput" {
-  type        = number
   description = "Max throughput of Cosmos database"
+  type        = number
   default     = 4000
 }
 
@@ -180,7 +181,7 @@ variable "sql_database_sku" {
 variable "sql_elasticpool_max_size_gb" {
   description = "SQL Server elasticpool max size gb"
   type        = number
-  default     = 4.5
+  default     = 4.8828125
 }
 
 variable "sql_elasticpool_sku" {
@@ -219,14 +220,14 @@ variable "appservice_deployment_slots" {
 }
 
 variable "appservice_plan_tier" {
-  type        = string
   description = "Tier of shared Appservice Plan in each region."
+  type        = string
   default     = "Standard" #"Basic"
 }
 
 variable "appservice_plan_size" {
-  type        = string
   description = "Size of shared Appservice Plan in each region."
+  type        = string
   default     = "S1" #"B1"
 }
 
