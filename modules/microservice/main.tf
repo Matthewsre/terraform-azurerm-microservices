@@ -221,8 +221,8 @@ resource "azurerm_mssql_database" "microservice_primary" {
   name            = local.microservice_environment_name
   server_id       = var.sql_servers[var.primary_region].id
   elastic_pool_id = var.sql == "elastic" ? var.sql_elastic_pools[var.primary_region].id : null
-  collation       = "SQL_Latin1_General_CP1_CI_AS"
-  sku_name        = var.sql == "elastic" ? "ElasticPool" : "BC_Gen5_2"
+  collation       = var.sql_database_collation
+  sku_name        = var.sql == "elastic" ? "ElasticPool" : var.sql_database_sku
 
   #max_size_gb     = 4
   #read_scale      = true

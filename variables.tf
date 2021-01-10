@@ -48,42 +48,6 @@ variable "callback_path" {
   default     = "/signin-oidc"
 }
 
-variable "cosmos_database_name" {
-  type        = string
-  description = "Name of shared DB created in Cosmos. Will default to service name if not provided."
-  default     = ""
-}
-
-variable "cosmos_autoscale_max_throughput" {
-  type        = number
-  description = "Max throughput of Cosmos database"
-  default     = 4000
-}
-
-variable "appservice_deployment_slots" {
-  description = "Additional deployment slots for app services. Standard and above plans allow for deployment slot."
-  type        = list(string)
-  default     = []
-}
-
-variable "appservice_plan_tier" {
-  type        = string
-  description = "Tier of shared Appservice Plan in each region."
-  default     = "Standard" #"Basic"
-}
-
-variable "appservice_plan_size" {
-  type        = string
-  description = "Size of shared Appservice Plan in each region."
-  default     = "S1" #"B1"
-}
-
-variable "servicebus_sku" {
-  type        = string
-  description = "Sku of shared ServiceBus namespace."
-  default     = "Basic"
-}
-
 # opened bug for lists with optional values https://github.com/hashicorp/terraform/issues/27374
 # this impacts cosmos_containers.max_throughput
 variable "microservices" {
@@ -130,10 +94,137 @@ variable "regions" {
   }
 }
 
+### Resource Group Variables
+
 variable "resource_group_tags" {
+  description = "Tags that will be applied to the resource group."
   type    = map(string)
   default = {}
 }
+
+### Application Insights Variables
+
+variable "application_insights_application_type" {
+  description = "Sku of shared ServiceBus namespace."
+  type        = string
+  default     = "web"
+}
+
+### Cosmos Variables
+
+variable "cosmos_database_name" {
+  description = "Name of shared DB created in Cosmos. Will default to service name if not provided."
+  type        = string
+  default     = ""
+}
+
+variable "cosmos_enable_free_tier" {
+  description = "Enable Free Tier pricing option for the Cosmos DB account."
+  type        = bool
+  default     = false
+}
+
+variable "cosmos_enable_automatic_failover" {
+  description = "Enable automatic failover option for the Cosmos DB account."
+  type        = bool
+  default     = true
+}
+
+variable "cosmos_consistency_level" {
+  description = "Enable automatic failover option for the Cosmos DB account."
+  type        = string
+  default     = "Strong"
+}
+
+variable "cosmos_autoscale_max_throughput" {
+  type        = number
+  description = "Max throughput of Cosmos database"
+  default     = 4000
+}
+
+### Service Bus Variables
+
+variable "servicebus_sku" {
+  description = "Sku of shared ServiceBus namespace."
+  type        = string
+  default     = "Basic"
+}
+
+### SQL Server Variables
+
+variable "sql_version" {
+  description = "SQL Server version"
+  type        = string
+  default     = "12.0"
+}
+
+variable "sql_minimum_tls_version" {
+  description = "SQL Server minimum TLS version"
+  type        = string
+  default     = "1.2"
+}
+
+
+variable "sql_database_collation" {
+  description = "SQL Server default database collation"
+  type        = string
+  default     = "SQL_Latin1_General_CP1_CI_AS"
+}
+
+variable "sql_database_sku" {
+  description = "SQL Server default database sku"
+  type        = string
+  default     = "Basic"
+}
+
+variable "sql_elasticpool_sku" {
+  description = "SQL Server elasticpool sku"
+  type        = object({
+    name     = string
+    tier     = string
+    capacity = number
+    family   = optional(string)
+  })
+  default     = {
+    name     = "BasicPool"
+    tier     = "Basic"
+    capacity = 50
+  }
+}
+
+variable "sql_elasticpool_per_database_settings" {
+  description = "SQL Server elasticpool database settings"
+  type        = object({
+    min_capacity = number
+    max_capacity = number
+  })
+  default     = {
+    min_capacity = 5
+    max_capacity = 5
+  }
+}
+
+### App Service Variables
+
+variable "appservice_deployment_slots" {
+  description = "Additional deployment slots for app services. Standard and above plans allow for deployment slot."
+  type        = list(string)
+  default     = []
+}
+
+variable "appservice_plan_tier" {
+  type        = string
+  description = "Tier of shared Appservice Plan in each region."
+  default     = "Standard" #"Basic"
+}
+
+variable "appservice_plan_size" {
+  type        = string
+  description = "Size of shared Appservice Plan in each region."
+  default     = "S1" #"B1"
+}
+
+### Storage Account Variables
 
 variable "storage_account_tier" {
   description = "Tier to use for storage account"
@@ -146,6 +237,8 @@ variable "storage_account_replication_type" {
   type        = string
   default     = "RAGRS"
 }
+
+### Key Vault Variables
 
 variable "key_vault_include_ip_address" {
   description = "Defines if the current ip should be included in the default network acls for key vaults"

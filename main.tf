@@ -127,8 +127,7 @@ resource "azurerm_application_insights" "service" {
   location            = local.primary_region
   resource_group_name = azurerm_resource_group.service.name
   retention_in_days   = var.retention_in_days
-  application_type    = "web"
-
+  application_type    = var.application_insights_application_type
 
   # these tags might be needed to link the application insights with the azure functions (seems to be linking correctly without)
   # more details available here: https://github.com/terraform-providers/terraform-provider-azurerm/issues/1303
@@ -146,7 +145,8 @@ resource "azurerm_cosmosdb_account" "service" {
   resource_group_name       = azurerm_resource_group.service.name
   location                  = local.primary_region
   offer_type                = "Standard"
-  enable_automatic_failover = true
+  enable_free_tier          = var.cosmos_enable_free_tier
+  enable_automatic_failover = var.cosmos_enable_automatic_failover
 
   consistency_policy {
     consistency_level = "Strong"
@@ -174,7 +174,7 @@ resource "azurerm_cosmosdb_sql_database" "service" {
 }
 
 resource "azurerm_key_vault" "service" {
-  name                        = "${local.service_name}-${local.environment_differentiator_short2}-${var.environment}"
+  name                        = local.environment_differentiator_short2 != "" ? "${local.service_name}-${local.environment_differentiator_short2}-${var.environment}" : "${local.service_name}-${var.environment}"
   location                    = local.primary_region
   resource_group_name         = azurerm_resource_group.service.name
   enabled_for_disk_encryption = true
@@ -237,6 +237,7 @@ resource "azurerm_servicebus_namespace" "service" {
 #### SQL Server
 
 resource "random_password" "sql_admin_password" {
+  count            = local.has_sql_server ? 1 : 0
   length           = 32
   min_special      = 1
   min_numeric      = 1
@@ -256,7 +257,7 @@ resource "azurerm_key_vault_secret" "sql_admin_login" {
 resource "azurerm_key_vault_secret" "sql_admin_password" {
   count        = local.has_sql_server ? 1 : 0
   name         = "sql-admin-password"
-  value        = random_password.sql_admin_password.result
+  value        = random_password.sql_admin_password[0].result
   key_vault_id = azurerm_key_vault.service.id
 }
 
@@ -266,10 +267,10 @@ resource "azurerm_mssql_server" "service" {
   name                         = "${local.service_name}${each.key}${local.environment_name}"
   resource_group_name          = azurerm_resource_group.service.name
   location                     = each.key
-  version                      = "12.0"
   administrator_login          = local.admin_login
-  administrator_login_password = random_password.sql_admin_password.result
-  minimum_tls_version          = "1.2"
+  administrator_login_password = random_password.sql_admin_password[0].result
+  version                      = var.sql_version
+  minimum_tls_version          = var.sql_minimum_tls_version
 
   #TODO: determine if we should  set the admin
   #   azuread_administrator {
@@ -298,17 +299,16 @@ resource "azurerm_mssql_elasticpool" "service" {
   server_name         = azurerm_mssql_server.service[each.key].name
   max_size_gb         = 756
 
-  # TODO: move options to input variables with default
   sku {
-    name     = "GP_Gen5"
-    tier     = "GeneralPurpose"
-    family   = "Gen5"
-    capacity = 4
+    name     = var.sql_elasticpool_sku.name
+    tier     = var.sql_elasticpool_sku.tier
+    family   = var.sql_elasticpool_sku.family
+    capacity = var.sql_elasticpool_sku.capacity
   }
 
   per_database_settings {
-    min_capacity = 0.25
-    max_capacity = 4
+    min_capacity = var.sql_elasticpool_per_database_settings.min_capacity
+    max_capacity = var.sql_elasticpool_per_database_settings.max_capacity
   }
 }
 
@@ -374,6 +374,8 @@ module "microservice" {
   storage_accounts                = azurerm_storage_account.service
   sql_servers                     = local.has_sql_server ? azurerm_mssql_server.service : null
   sql_elastic_pools               = local.has_sql_server_elastic ? azurerm_mssql_elasticpool.service : null
+  sql_database_collation          = var.sql_database_collation
+  sql_database_sku                = var.sql_database_sku
   cosmosdb_account_name           = local.has_cosmos ? azurerm_cosmosdb_account.service[0].name : null
   cosmosdb_sql_database_name      = local.has_cosmos ? azurerm_cosmosdb_sql_database.service[0].name : null
   cosmosdb_endpoint               = local.has_cosmos ? azurerm_cosmosdb_account.service[0].endpoint : null

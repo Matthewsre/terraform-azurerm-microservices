@@ -129,6 +129,18 @@ variable "sql_elastic_pools" {
   default     = null
 }
 
+variable "sql_database_collation" {
+  description = "SQL Server default database collation"
+  type        = string
+  default     = "SQL_Latin1_General_CP1_CI_AS"
+}
+
+variable "sql_database_sku" {
+  description = "SQL Server default database sku"
+  type        = string
+  default     = "Basic"
+}
+
 variable "cosmos_containers" {
   type = list(object({
     name               = string
