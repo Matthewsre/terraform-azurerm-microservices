@@ -297,7 +297,7 @@ resource "azurerm_mssql_elasticpool" "service" {
   resource_group_name = azurerm_resource_group.service.name
   location            = each.key
   server_name         = azurerm_mssql_server.service[each.key].name
-  max_size_gb         = 756
+  max_size_gb         = var.sql_elasticpool_max_size_gb
 
   sku {
     name     = var.sql_elasticpool_sku.name
