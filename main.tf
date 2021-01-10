@@ -127,8 +127,7 @@ resource "azurerm_application_insights" "service" {
   location            = local.primary_region
   resource_group_name = azurerm_resource_group.service.name
   retention_in_days   = var.retention_in_days
-  application_type    = "web"
-
+  application_type    = var.application_insights_application_type
 
   # these tags might be needed to link the application insights with the azure functions (seems to be linking correctly without)
   # more details available here: https://github.com/terraform-providers/terraform-provider-azurerm/issues/1303
@@ -146,7 +145,8 @@ resource "azurerm_cosmosdb_account" "service" {
   resource_group_name       = azurerm_resource_group.service.name
   location                  = local.primary_region
   offer_type                = "Standard"
-  enable_automatic_failover = true
+  enable_free_tier          = var.cosmos_enable_free_tier
+  enable_automatic_failover = var.cosmos_enable_automatic_failover
 
   consistency_policy {
     consistency_level = "Strong"

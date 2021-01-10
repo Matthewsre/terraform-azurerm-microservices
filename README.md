@@ -38,9 +38,8 @@ terraform apply -parallelism=1 "dev.tfplan"
 ```
 
 ```hcl
-
 module "microservice" {
-  source = "github.com/matthewsre/terraform-azurerm-microservices"
+  source = "Matthewsre/microservices/azurerm"
 
   service_name = "myservice"
   regions      = ["westus2", "eastus"]
@@ -195,7 +194,96 @@ KeyVault
 
 # Global Resources
 
-## Resource Group
+## Primary Region
 
-All resources for the service will be put into a single resource group
+The order of the regions passed into the region variable is used to determine the primary region that will be used for global resources.
 
+```hcl
+module "microservice" {
+  source = "Matthewsre/microservices/azurerm"
+
+  ...
+
+  regions = [
+    "westus2",  # <== Primary Region
+    "eastus",   # <== Secondary Region
+    "japan"
+  ]
+}
+```
+
+## Resource Group (azurerm_resource_group)
+
+All resources for the service will be put into a single global resource group.
+
+If tags are needed on the resource group you can pass them into the resource_group_tags variable:
+
+```hcl
+module "microservice" {
+  source = "Matthewsre/microservices/azurerm"
+
+  ...
+
+  resource_group_tags = {
+    environment = "production"
+    role        = "service"
+    foo         = "bar"
+  }
+}
+```
+
+## Application Insights (azurerm_application_insights)
+
+A single Application Insights instance will be created and will be added to the configuration of App Services and Function Apps.
+
+The retention_in_days variable, which defaults to 90 and is used for multiple resource types, sets the retention period for Application Insights.
+
+The application_insights_application_type is used to specify the type to create. Default is "web".
+
+## Azure CosmosDB Account (azurerm_cosmosdb_account)
+
+A single Cosmos DB Account will be created if any of the microservices have a container specified.
+
+```hcl
+module "microservice" {
+  source = "Matthewsre/microservices/azurerm"
+
+  ...
+
+  microservices = [
+    {
+      ...
+    
+      cosmos_containers = [
+        {
+          name               = "AppObjectContainer"
+          partition_key_path = "/PartitionKey"
+          max_throughput     = 0
+        },
+    }
+  ]
+}
+```
+
+ The Cosmos DB Location will be set to the primary region. Any additional regions will be added as geo_locations with a failover priority that matches their index specified.
+
+```hcl
+module "microservice" {
+  source = "Matthewsre/microservices/azurerm"
+
+  ...
+
+  regions = [
+    "westus2",  # <== failover_priority = 0
+    "eastus",   # <== failover_priority = 1
+    "japan"     # <== failover_priority = 2
+  ]
+}
+```
+
+The cosmos_enable_free_tier variable can optionally be set to true to enable the free tier pricing option.
+
+# Regional Resources
+
+
+# Microservice Resources
