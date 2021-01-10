@@ -267,10 +267,10 @@ resource "azurerm_mssql_server" "service" {
   name                         = "${local.service_name}${each.key}${local.environment_name}"
   resource_group_name          = azurerm_resource_group.service.name
   location                     = each.key
-  version                      = "12.0"
   administrator_login          = local.admin_login
-  administrator_login_password = random_password.sql_admin_password.result
-  minimum_tls_version          = "1.2"
+  administrator_login_password = random_password.sql_admin_password[0].result
+  version                      = var.sql_version
+  minimum_tls_version          = var.sql_minimum_tls_version
 
   #TODO: determine if we should  set the admin
   #   azuread_administrator {
@@ -299,17 +299,16 @@ resource "azurerm_mssql_elasticpool" "service" {
   server_name         = azurerm_mssql_server.service[each.key].name
   max_size_gb         = 756
 
-  # TODO: move options to input variables with default
   sku {
-    name     = "GP_Gen5"
-    tier     = "GeneralPurpose"
-    family   = "Gen5"
-    capacity = 4
+    name     = var.sql_elasticpool_sku.name
+    tier     = var.sql_elasticpool_sku.tier
+    family   = var.sql_elasticpool_sku.family
+    capacity = var.sql_elasticpool_sku.capacity
   }
 
   per_database_settings {
-    min_capacity = 0.25
-    max_capacity = 4
+    min_capacity = var.sql_elasticpool_per_database_settings.min_capacity
+    max_capacity = var.sql_elasticpool_per_database_settings.max_capacity
   }
 }
 
@@ -375,6 +374,8 @@ module "microservice" {
   storage_accounts                = azurerm_storage_account.service
   sql_servers                     = local.has_sql_server ? azurerm_mssql_server.service : null
   sql_elastic_pools               = local.has_sql_server_elastic ? azurerm_mssql_elasticpool.service : null
+  sql_database_collation          = var.sql_database_collation
+  sql_database_sku                = var.sql_database_sku
   cosmosdb_account_name           = local.has_cosmos ? azurerm_cosmosdb_account.service[0].name : null
   cosmosdb_sql_database_name      = local.has_cosmos ? azurerm_cosmosdb_sql_database.service[0].name : null
   cosmosdb_endpoint               = local.has_cosmos ? azurerm_cosmosdb_account.service[0].endpoint : null

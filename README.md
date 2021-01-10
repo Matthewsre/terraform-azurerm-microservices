@@ -283,7 +283,70 @@ module "microservice" {
 
 The cosmos_enable_free_tier variable can optionally be set to true to enable the free tier pricing option.
 
+The cosmos_enable_automatic_failover variable can optionally be set.
+
+## Key Vault (azurerm_key_vault)
+
+A global Key Vault is configured to store secrets for global resources. Currently the sql-admin-login and randomly generated sql-admin-password are stored in this vault. There are also separate Key Vaults created for each service.
+
+An access policy is added for the current account Terraform is running under to enable management of secrets. The default values for this policy include all permissions and can be modified using the key_vault_permissions variable.
+
+The network acls can also be set on Key Vault using the key_vault_network_acls variable. If the key_vault_include_ip_address variable is set then the current executions external ip address will be looked up and added to the ip_rules of that object.
+
+When using "dev" as the environment, no network_acl is specified, and key_vault_include_ip_address is not specified then a default policy will be added with an exception for the current ip address. This is to help ease pain points when working from dev envrionments, but the ip address found externally might not always match what is seen by Azure due to firewall configurations.  
+
 # Regional Resources
+
+## Azure Storage Account (azurerm_storage_account)
+
+A Storage Account is created in each region specified.
+
+The storage_account_tier and storage_account_replication_type variables are used when configuring this account.
+
+## Servicebus Namespace (azurerm_servicebus_namespace)
+
+A ServiceBus namespace is created in each region specified only if any of the microservices have a queue specified. If no services have queues, then nothing will be created.
+
+The servicebus_sku variable is used for this configuration. 
+
+*ServiceBus region pairing is not yet configurable in this module.*
+
+## Azure SQL Server (azurerm_mssql_server, azurerm_mssql_elasticpool, azurerm_sql_failover_group)
+
+An Azure SQL Server is created in each region specified only if any of the microservices have sql specified. If no services have queues, then nothing will be created.
+
+The options for SQL in each microservice are "server" and "elastic". If any service has the elastic option set, then an elastic pool will also be created.
+
+The storage accounts created in each region will be used when creating the SQL Server.
+
+The login and password will be the same across all regions and stored in the global Key Vault.
+
+The sql_version and sql_minimum_tls_version can be used to configure the server settings.
+
+The sql_elasticpool_sku and sql_elasticpool_per_database_settings can be used to configure the elastic pool options from the defaults.
+
+The sql_database_collation and sql_database_sku will be the default values for all databases created for each service. If the database is elastic then sql_database_sku will not be used.
+
+## App Service Plans (azurerm_app_service_plan)
+
 
 
 # Microservice Resources
+
+## Managed Service Identities (azurerm_user_assigned_identity)
+
+## Key Vault (azurerm_key_vault)
+
+## ServiceBus Queues (azurerm_servicebus_queue)
+
+## AAD Application (azuread_application)
+
+## Azure SQL Server Database (azurerm_mssql_database)
+
+## Cosmos DB Container (azurerm_cosmosdb_sql_container)
+
+## App Service (azurerm_app_service, azurerm_app_service_slot)
+
+## Function App (azurerm_function_app, azurerm_function_app_slot)
+
+## Traffic Manager (azurerm_traffic_manager_profile, azurerm_traffic_manager_endpoint)

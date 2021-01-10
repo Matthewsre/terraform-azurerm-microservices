@@ -150,6 +150,60 @@ variable "servicebus_sku" {
   default     = "Basic"
 }
 
+### SQL Server Variables
+
+variable "sql_version" {
+  description = "SQL Server version"
+  type        = string
+  default     = "12.0"
+}
+
+variable "sql_minimum_tls_version" {
+  description = "SQL Server minimum TLS version"
+  type        = string
+  default     = "1.2"
+}
+
+
+variable "sql_database_collation" {
+  description = "SQL Server default database collation"
+  type        = string
+  default     = "SQL_Latin1_General_CP1_CI_AS"
+}
+
+variable "sql_database_sku" {
+  description = "SQL Server default database sku"
+  type        = string
+  default     = "Basic"
+}
+
+variable "sql_elasticpool_sku" {
+  description = "SQL Server elasticpool sku"
+  type        = object({
+    name     = string
+    tier     = string
+    capacity = number
+    family   = optional(string)
+  })
+  default     = {
+    name     = "BasicPool"
+    tier     = "Basic"
+    capacity = 50
+  }
+}
+
+variable "sql_elasticpool_per_database_settings" {
+  description = "SQL Server elasticpool database settings"
+  type        = object({
+    min_capacity = number
+    max_capacity = number
+  })
+  default     = {
+    min_capacity = 5
+    max_capacity = 5
+  }
+}
+
 ### App Service Variables
 
 variable "appservice_deployment_slots" {
