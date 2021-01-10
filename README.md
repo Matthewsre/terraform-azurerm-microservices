@@ -323,7 +323,7 @@ The login and password will be the same across all regions and stored in the glo
 
 The sql_version and sql_minimum_tls_version can be used to configure the server settings.
 
-The sql_elasticpool_sku and sql_elasticpool_per_database_settings can be used to configure the elastic pool options from the defaults.
+The sql_elasticpool_max_size_gb, sql_elasticpool_sku, and sql_elasticpool_per_database_settings can be used to configure the elastic pool options from the defaults.
 
 The sql_database_collation and sql_database_sku will be the default values for all databases created for each service. If the database is elastic then sql_database_sku will not be used.
 

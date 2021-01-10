@@ -177,6 +177,12 @@ variable "sql_database_sku" {
   default     = "Basic"
 }
 
+variable "sql_elasticpool_max_size_gb" {
+  description = "SQL Server elasticpool max size gb"
+  type        = number
+  default     = 4.5
+}
+
 variable "sql_elasticpool_sku" {
   description = "SQL Server elasticpool sku"
   type        = object({
