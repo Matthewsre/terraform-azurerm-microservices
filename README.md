@@ -240,6 +240,14 @@ The retention_in_days variable, which defaults to 90 and is used for multiple re
 
 The application_insights_application_type is used to specify the type to create. Default is "web".
 
+Configurations will be set on the App Service and Function Apps:
+```
+"APPINSIGHTS_INSTRUMENTATIONKEY"
+"APPLICATIONINSIGHTS_CONNECTION_STRING"
+"ApplicationInsightsAgent_EXTENSION_VERSION" # ("~2")
+"ApplicationInsights:InstrumentationKey"
+```
+
 ## Azure CosmosDB Account (azurerm_cosmosdb_account)
 
 A single Cosmos DB Account will be created if any of the microservices have a container specified.
@@ -329,24 +337,151 @@ The sql_database_collation and sql_database_sku will be the default values for a
 
 ## App Service Plans (azurerm_app_service_plan)
 
+An App Service Plan is created in each region specified if any of the microservices have appservice or function specified.
+
+The only option currently for appservice in each microservice is "plan".
+
+The options for function in each microservice is "plan" or "consumption". A service can have both appservice and function provided.
+
+An App Service Plan will be created based on the appservice_plan_tier and appservice_plan_size variables if there are any microservices with appservice or function set to "plan".
+
+A separate dynamic App Service Plan will be created if there are any microservices with function set to "consumption".
 
 
 # Microservice Resources
 
 ## Managed Service Identities (azurerm_user_assigned_identity)
 
+Each App Service and Function App will have a system assigned identity created.
+
+Each App Service and Function App will also have a user assigned identities created for KeyVault, SQL Server, ServiceBus, and CosmosDB.
+
+The ID's of user assigned identities will be provided in the App Service and Function App Settings
+
+```
+"KeyVault:ManagedServiceAppId"
+"Database:ManagedServiceAppId"
+"ServiceBus:ManagedServiceAppId"
+"DocumentStore:ManagedServiceAppId"
+```
+
+Currently Key Vault Identity is configured with an access policy for retrieving Key Vault secrets and keys ("get"). The other identities are not currently configured, but that will be added soon where supported. 
+
+*Service Bus queue triggered Azure Function currently does not have a solution for User Assigned identitied with connection strings and might need to use system assigned.*
+
 ## Key Vault (azurerm_key_vault)
+
+A Key Vault is created for each service with an access policy for the key vault specific user assigned identity.
+
+Configurations will be set on the App Service and Function Apps:
+```
+"KeyVault:BaseUri"
+"KeyVault:ManagedServiceAppId"
+```
 
 ## ServiceBus Queues (azurerm_servicebus_queue)
 
+If any queues are specified for the microservice they will be created based on the name.
+
+If any queues are specified the following configurations will be set on the App Service and Function Apps:
+```
+"ServiceBus:Connection"
+"ServiceBus:ManagedServiceAppId"
+```
+
+Function Apps will also have the following config value set to support queue triggered functions:
+```
+"ServiceBusConnection"
+```
+
+*Access policies are not currently configured automatically, but that will be added soon*
+
 ## AAD Application (azuread_application)
+
+An AAD Application will be registered for each application. If no roles are specified then an "InternalService" role will be added for service to service communication.
 
 ## Azure SQL Server Database (azurerm_mssql_database)
 
+If sql is specified and set to either "server" or "elastic" then a database will be created in each region with the default server or elestic pool settings. The regions that are not primary will be created with as "Secondary" and reference the primary region database for configuration options.
+
+The variables sql_database_collation and sql_database_sku can optionally be set to change from the defaults, but will be the same for all services. Custom configuration for each service is not currently an option, but is planned.
+
+If sql specified for the microservice the following configurations will be set on the App Service and Function Apps:
+```
+      "Database:ConnectionString"
+      "Database:ManagedServiceAppId"
+```
+
+*NOTE: Secondary creation is included to also ensure destroy works correctly. If relying on the failober group to handle the creation without being specified, then there are errors when running destroy preventing deleting the elasticpool/server since databases exist that terrafor did not create.*
+
 ## Cosmos DB Container (azurerm_cosmosdb_sql_container)
+
+If any containers are specified for the microservice they will be created based on the name, partition_key_path, and max_throughput. 
+
+*Currently all 3 values are required due to a bug with optional properties in terraform, but partition_key_path and max_throughput will be optional with default values once the bug is resolved.*
+
+The max_throughput can be specified for a specific container. 
+
+If any queues are specified the following configurations will be set on the App Service and Function Apps:
+```
+"ServiceBus:Connection"
+"ServiceBus:ManagedServiceAppId"
+```
+
+*Access policies are not currently configured automatically, but that will be added soon*
 
 ## App Service (azurerm_app_service, azurerm_app_service_slot)
 
+The only option currently for appservice in each microservice is "plan".
+
+App Service will have a system assigned identity created and all user assigned identitied will be added.
+
+The following app settings will also be configured:
+
+```
+# General Settings
+"APPINSIGHTS_INSTRUMENTATIONKEY"
+"APPLICATIONINSIGHTS_CONNECTION_STRING"
+"ApplicationInsightsAgent_EXTENSION_VERSION"  # ("~2")
+"AzureAd:Instance"                            # ("https://login.microsoftonline.com/")
+"AzureAd:Domain"                              # ("microsoft.onmicrosoft.com")
+"AzureAd:TenantId"
+"AzureAd:ClientId"
+"AzureAd:CallbackPath"
+"ApplicationInsights:InstrumentationKey"
+"KeyVault:BaseUri"
+"KeyVault:ManagedServiceAppId"
+
+# Conditional SQL Settings
+"Database:ConnectionString"
+"Database:ManagedServiceAppId"
+
+# Conditional ServiceBus Settings
+"ServiceBus:ConnectionString"
+"ServiceBus:ManagedServiceAppId"
+
+# Conditional CosmosDB Settings 
+"DocumentStore:Url"
+"DocumentStore:ManagedServiceAppId"
+```
+
+Slots will be created for all services if the slots variable it set.
+
+*Slots are currently configured with a 15 second delay prior to creation and after creation to avoin conflicts that can occur with the app service and traffic manager.*
+
 ## Function App (azurerm_function_app, azurerm_function_app_slot)
+
+A Function App will be created is function is specified with "plan" or "consumption".
+
+All of the same information applies from the App Service section except the "consumption" option will add the function to the dynamic App Service Plan.
+
+Function Apps will also have the following app settings values set:
+```
+"FUNCTIONS_WORKER_RUNTIME" # "dotnet"
+
+# Conditional ServiceBus Settings
+"ServiceBusConnection"
+
+```
 
 ## Traffic Manager (azurerm_traffic_manager_profile, azurerm_traffic_manager_endpoint)

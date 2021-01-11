@@ -1,48 +1,48 @@
 variable "use_msi_to_authenticate" {
-  type        = bool
   description = "Use a managed service identity to authenticate"
+  type        = bool
   default     = false
 }
 
 variable "resource_group_name" {
-  type        = string
   description = "Name of the resource group"
+  type        = string
 }
 
 variable "name" {
-  type        = string
   description = "Name of the microservice"
+  type        = string
 }
 
 variable "service_name" {
-  type        = string
   description = "Name of the top level service for the microservice"
+  type        = string
 }
 
 variable "environment_differentiator" {
-  type        = string
   description = "Value can be used to allow multiple envrionments."
+  type        = string
   default     = ""
 }
 
 variable "primary_region" {
-  type        = string
   description = "Primary region used for shared resources. If not provided will use first value from 'regions'"
+  type        = string
 }
 
 variable "secondary_region" {
-  type        = string
   description = "Secondary region used for shared resources. If not provided will use second value from 'regions'"
+  type        = string
 }
 
 variable "retention_in_days" {
-  type        = number
   description = "Days set for retention policies"
+  type        = number
 }
 
 variable "environment" {
-  type        = string
   description = "Terrform environment we're acting in"
+  type        = string
   validation {
     condition     = contains(["dev", "tst", "ppe", "prd"], lower(var.environment))
     error_message = "Environment must be 'dev', 'tst', 'ppe', or 'prd'."
@@ -50,24 +50,24 @@ variable "environment" {
 }
 
 variable "environment_name" {
-  type        = string
   description = "Name of the environment including differentiator"
+  type        = string
 }
 
 variable "roles" {
-  type        = list(string)
   description = "Roles to provision for the AAD application"
+  type        = list(string)
   default     = []
 }
 
 variable "callback_path" {
-  type        = string
   description = "Callback path for authorization"
+  type        = string
 }
 
 variable "appservice" {
-  type        = string
   description = "Specify appservice type if used ('plan' or 'consumption')"
+  type        = string
   default     = ""
   validation {
     condition     = var.appservice == null ? true : contains(["", "plan"], lower(var.appservice))
@@ -81,8 +81,8 @@ variable "appservice_deployment_slots" {
 }
 
 variable "function" {
-  type        = string
   description = "Specify function type if used ('plan' or 'consumption')"
+  type        = string
   default     = ""
   validation {
     condition     = var.function == null ? true : contains(["", "plan", "consumption"], lower(var.function))
@@ -91,8 +91,8 @@ variable "function" {
 }
 
 variable "sql" {
-  type        = string
   description = "Specify SQL type if used ('server' or 'elastic')"
+  type        = string
   default     = ""
   validation {
     condition     = var.sql == null ? true : contains(["", "server", "elastic"], lower(var.sql))
@@ -101,31 +101,31 @@ variable "sql" {
 }
 
 variable "http" {
+  description = "Target option for http traffic manager configuration and optional consumers to request role"
   type = object({
     target    = string
     consumers = optional(list(string))
   })
-  description = "Target option for http traffic manager configuration and optional consumers to request role"
   default     = null
 }
 
 variable "sql_servers" {
+  description = "SQL Servers to use"
   type = map(object({
     id       = string
     name     = string
     location = string
   }))
-  description = "SQL Servers to use"
   default     = null
 }
 
 variable "sql_elastic_pools" {
+  description = "SQL Elastic Pools to use"
   type = map(object({
     id       = string
     name     = string
     location = string
   }))
-  description = "SQL Elastic Pools to use"
   default     = null
 }
 
@@ -142,100 +142,100 @@ variable "sql_database_sku" {
 }
 
 variable "cosmos_containers" {
+  description = "Microservice containers for cosmos DB"
   type = list(object({
     name               = string
     partition_key_path = string
     max_throughput     = optional(number)
   }))
-  description = "Microservice containers for cosmos DB"
   default     = []
 }
 
 variable "queues" {
+  description = "Queues for microservice consumption and publishers"
   type = list(object({
     name       = string
     publishers = list(string)
   }))
-  description = "Queues for microservice consumption and publishers"
   default     = []
 }
 
 variable "cosmosdb_account_name" {
-  type        = string
   description = "Cosmos DB account name"
+  type        = string
   default     = ""
 }
 
 variable "cosmosdb_endpoint" {
-  type        = string
   description = "Cosmos DB endpoint"
+  type        = string
   default     = ""
 }
 
 variable "cosmosdb_sql_database_name" {
-  type        = string
   description = "Cosmos SQL database name"
+  type        = string
   default     = ""
 }
 
 variable "cosmos_autoscale_max_throughput" {
-  type        = number
   description = "Max throughput of Cosmos database"
+  type        = number
 }
 
 variable "azurerm_client_config" {
+  description = "Azurerm provider client configuration to use"
   type = object({
     tenant_id = string
     object_id = string
   })
-  description = "Azurerm provider client configuration to use"
 }
 
 variable "application_insights" {
+  description = "Application Insights to use"
   type = object({
     instrumentation_key = string
     connection_string   = string
   })
-  description = "Application Insights to use"
 }
 
 variable "storage_accounts" {
+  description = "Storage accounts to use"
   type = map(object({
     id                    = string
     name                  = string
     primary_blob_endpoint = string
     primary_access_key    = string
   }))
-  description = "Storage accounts to use"
   sensitive   = true
   default     = {}
 }
 
 variable "servicebus_namespaces" {
+  description = "ServiceBus Namespaces to use"
   type = map(object({
     id       = string
     name     = string
     location = string
   }))
-  description = "ServiceBus Namespaces to use"
   default     = {}
 }
 
 variable "appservice_plans" {
+  description = "Appservice plans to use"
   type = map(object({
     id       = string
     location = string
   }))
-  description = "Appservice plans to use"
   default     = {}
 }
 
 variable "consumption_appservice_plans" {
+  description = "Consumption based appservice plans to use"
   type = map(object({
     id       = string
     location = string
   }))
-  description = "Consumption based appservice plans to use"
   default     = {}
 }
 

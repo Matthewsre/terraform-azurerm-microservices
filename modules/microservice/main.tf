@@ -29,7 +29,7 @@ locals {
   max_environment_differentiator_short = local.max_name_length - (length(var.name) + length(var.environment) + 2)
   environment_differentiator_short     = local.max_environment_differentiator_short > 0 ? length(var.environment_differentiator) <= local.max_environment_differentiator_short ? var.environment_differentiator : substr(var.environment_differentiator, 0, local.max_environment_differentiator_short) : ""
 
-  key_vaul_access_policies = [
+  key_vault_access_policies = [
     {
       tenant_id = var.azurerm_client_config.tenant_id
       object_id = var.azurerm_client_config.object_id
@@ -295,9 +295,11 @@ locals {
       "KeyVault:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_key_vault[0].client_id
     } : {},
     local.has_sql_database ? {
+      "Database:ConnectionString"    = "Server=${var.sql_servers[var.primary_region].fully_qualified_domain_name},1433;Database=${azurerm_mssql_database.microservice_primary[0].name};UID=${azurerm_user_assigned_identity.microservice_sql[0].client_id};Authentication=Active Directory Interactive"
       "Database:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_sql[0].client_id
     } : {},
     local.has_servicebus_queues ? {
+      "ServiceBus:ConnectionString"          = "Endpoint=sb://${var.servicebus_namespaces[var.primary_region].name}.servicebus.windows.net/;Authentication=Managed Identity"
       "ServiceBus:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_servicebus[0].client_id
     } : {},
     local.has_cosmos_container ? {
