@@ -96,6 +96,15 @@ variable "regions" {
 }
 
 ### Resource Group Variables
+variable "resource_group" {
+  description = "Optional existing resource group to deploy resources into."
+  type    = object({
+    location    = string
+    name        = string
+    id          = string
+  })
+  default = null
+}
 
 variable "resource_group_tags" {
   description = "Tags that will be applied to the resource group."
