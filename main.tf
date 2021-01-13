@@ -119,7 +119,6 @@ locals {
 locals {
   create_resource_group = var.resource_group == null
   resource_group = {
-    location    = local.create_resource_group ? azurerm_resource_group.service[0].location : var.resource_group.location
     name        = local.create_resource_group ? azurerm_resource_group.service[0].name : var.resource_group.name
   }
 }

@@ -99,7 +99,6 @@ variable "regions" {
 variable "resource_group" {
   description = "Optional existing resource group to deploy resources into."
   type    = object({
-    location    = string
     name        = string
   })
   default = null
