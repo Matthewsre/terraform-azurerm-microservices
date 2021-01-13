@@ -116,8 +116,15 @@ locals {
 #### Shared Global Resources ####
 #################################
 
+locals {
+  create_resource_group = var.resource_group_name == ""
+  resource_group_name = local.create_resource_group ? azurerm_resource_group.service[0].name : var.resource_group_name
+}
+
 resource "azurerm_resource_group" "service" {
-  name     = local.service_environment_name
+  count = local.create_resource_group ? 1 : 0
+
+  name     = var.resource_group_name_override == "" ? local.service_environment_name : var.resource_group_name_override
   location = local.primary_region
   tags     = var.resource_group_tags
 }
@@ -125,7 +132,7 @@ resource "azurerm_resource_group" "service" {
 resource "azurerm_application_insights" "service" {
   name                = local.service_environment_name
   location            = local.primary_region
-  resource_group_name = azurerm_resource_group.service.name
+  resource_group_name = local.resource_group_name
   retention_in_days   = var.retention_in_days
   application_type    = var.application_insights_application_type
 
@@ -134,7 +141,7 @@ resource "azurerm_application_insights" "service" {
   # stackoverflow here: https://stackoverflow.com/questions/60175600/how-to-associate-an-azure-app-service-with-an-application-insights-resource-new
   #
   #   tags = {
-  #     "hidden-link:/subscriptions/${data.azurerm_subscription.current.subscription_id}/resourceGroups/${azurerm_resource_group.service.name}/providers/Microsoft.Web/sites/${local.function_app_name}" = "Resource"
+  #     "hidden-link:/subscriptions/${data.azurerm_subscription.current.subscription_id}/resourceGroups/${local.resource_group_name}/providers/Microsoft.Web/sites/${local.function_app_name}" = "Resource"
   #   }
 
 }
@@ -142,7 +149,7 @@ resource "azurerm_application_insights" "service" {
 resource "azurerm_cosmosdb_account" "service" {
   count                     = local.has_cosmos ? 1 : 0
   name                      = local.service_environment_name
-  resource_group_name       = azurerm_resource_group.service.name
+  resource_group_name       = local.resource_group_name
   location                  = local.primary_region
   offer_type                = "Standard"
   enable_free_tier          = var.cosmos_enable_free_tier
@@ -165,7 +172,7 @@ resource "azurerm_cosmosdb_account" "service" {
 resource "azurerm_cosmosdb_sql_database" "service" {
   count               = local.has_cosmos ? 1 : 0
   name                = var.cosmos_database_name == "" ? local.service_name : var.cosmos_database_name
-  resource_group_name = azurerm_resource_group.service.name
+  resource_group_name = local.resource_group_name
   account_name        = azurerm_cosmosdb_account.service[0].name
 
   autoscale_settings {
@@ -176,7 +183,7 @@ resource "azurerm_cosmosdb_sql_database" "service" {
 resource "azurerm_key_vault" "service" {
   name                        = local.environment_differentiator_short2 != "" ? "${local.service_name}-${local.environment_differentiator_short2}-${var.environment}" : "${local.service_name}-${var.environment}"
   location                    = local.primary_region
-  resource_group_name         = azurerm_resource_group.service.name
+  resource_group_name         = local.resource_group_name
   enabled_for_disk_encryption = true
   tenant_id                   = data.azurerm_client_config.current.tenant_id
   soft_delete_enabled         = true
@@ -214,7 +221,7 @@ resource "azurerm_storage_account" "service" {
   for_each = toset(var.regions)
 
   name                     = "${local.service_name}${each.key}${local.environment_differentiator_short}${var.environment}"
-  resource_group_name      = azurerm_resource_group.service.name
+  resource_group_name      = local.resource_group_name
   location                 = each.key
   account_tier             = var.storage_account_tier
   account_replication_type = var.storage_account_replication_type
@@ -226,7 +233,7 @@ resource "azurerm_servicebus_namespace" "service" {
   for_each = toset(local.servicebus_regions)
 
   name                = "${local.service_name}${each.key}${local.environment_name}"
-  resource_group_name = azurerm_resource_group.service.name
+  resource_group_name = local.resource_group_name
   location            = each.key
   sku                 = var.servicebus_sku
 }
@@ -265,7 +272,7 @@ resource "azurerm_mssql_server" "service" {
   for_each = toset(local.sql_server_regions)
 
   name                         = "${local.service_name}${each.key}${local.environment_name}"
-  resource_group_name          = azurerm_resource_group.service.name
+  resource_group_name          = local.resource_group_name
   location                     = each.key
   administrator_login          = local.admin_login
   administrator_login_password = random_password.sql_admin_password[0].result
@@ -294,7 +301,7 @@ resource "azurerm_mssql_elasticpool" "service" {
   for_each = toset(local.sql_server_elastic_regions)
 
   name                = "${local.service_name}-${local.environment_name}"
-  resource_group_name = azurerm_resource_group.service.name
+  resource_group_name = local.resource_group_name
   location            = each.key
   server_name         = azurerm_mssql_server.service[each.key].name
   max_size_gb         = var.sql_elasticpool_max_size_gb
@@ -319,7 +326,7 @@ resource "azurerm_app_service_plan" "service" {
 
   name                = "${local.service_name}-${each.key}-${local.environment_name}"
   location            = each.key
-  resource_group_name = azurerm_resource_group.service.name
+  resource_group_name = local.resource_group_name
   #per_site_scaling    = true
 
   sku {
@@ -333,7 +340,7 @@ resource "azurerm_app_service_plan" "service_consumption" {
 
   name                = "${local.service_name}-dyn-${each.key}-${local.environment_name}"
   location            = each.key
-  resource_group_name = azurerm_resource_group.service.name
+  resource_group_name = local.resource_group_name
   kind                = "FunctionApp"
 
   sku {
@@ -361,7 +368,7 @@ module "microservice" {
   http                            = each.value.http
   cosmos_containers               = each.value.cosmos_containers == null ? [] : each.value.cosmos_containers
   queues                          = each.value.queues == null ? [] : each.value.queues
-  resource_group_name             = azurerm_resource_group.service.name
+  resource_group_name             = local.resource_group_name
   retention_in_days               = var.retention_in_days
   primary_region                  = local.primary_region
   secondary_region                = local.secondary_region
@@ -410,7 +417,7 @@ module "microservice_traffic" {
   for_each = module.microservice
 
   name                     = each.value.traffic_data.microservice_environment_name
-  resource_group_name      = azurerm_resource_group.service.name
+  resource_group_name      = local.resource_group_name
   azure_endpoint_resources = each.value.traffic_data.azure_endpoint_resources
 
   depends_on = [
@@ -425,7 +432,7 @@ resource "azurerm_sql_failover_group" "service" {
   count = local.has_sql_server && length(var.regions) > 1 ? 1 : 0
 
   name                = local.service_environment_name
-  resource_group_name = azurerm_resource_group.service.name
+  resource_group_name = local.resource_group_name
   server_name         = azurerm_mssql_server.service[local.primary_region].name
 
   databases = [for service in module.microservice : service.database_id if service.database_id != null]
