@@ -96,12 +96,16 @@ variable "regions" {
 }
 
 ### Resource Group Variables
-variable "resource_group" {
+variable "resource_group_name" {
   description = "Optional existing resource group to deploy resources into."
-  type    = object({
-    name        = string
-  })
-  default = null
+  type    = string
+  default = ""
+}
+
+variable "resource_group_name_override" {
+  description = "Optional name override to use in creating the new resource group. This value is ignored when a resource_group_name for an existing resource group is provided."
+  type    = string
+  default = ""
 }
 
 variable "resource_group_tags" {
