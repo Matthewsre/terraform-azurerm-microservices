@@ -106,17 +106,18 @@ variable "http" {
     target    = string
     consumers = optional(list(string))
   })
-  default     = null
+  default = null
 }
 
 variable "sql_servers" {
   description = "SQL Servers to use"
   type = map(object({
-    id       = string
-    name     = string
-    location = string
+    id                          = string
+    name                        = string
+    location                    = string
+    fully_qualified_domain_name = string
   }))
-  default     = null
+  default = null
 }
 
 variable "sql_elastic_pools" {
@@ -126,7 +127,7 @@ variable "sql_elastic_pools" {
     name     = string
     location = string
   }))
-  default     = null
+  default = null
 }
 
 variable "sql_database_collation" {
@@ -148,7 +149,7 @@ variable "cosmos_containers" {
     partition_key_path = string
     max_throughput     = optional(number)
   }))
-  default     = []
+  default = []
 }
 
 variable "queues" {
@@ -157,7 +158,7 @@ variable "queues" {
     name       = string
     publishers = list(string)
   }))
-  default     = []
+  default = []
 }
 
 variable "cosmosdb_account_name" {
@@ -170,6 +171,13 @@ variable "cosmosdb_endpoint" {
   description = "Cosmos DB endpoint"
   type        = string
   default     = ""
+}
+
+variable "cosmos_primary_key" {
+  description = "Cosmos DB Primary Key"
+  type        = string
+  default     = ""
+  sensitive   = true
 }
 
 variable "cosmosdb_sql_database_name" {
@@ -207,8 +215,8 @@ variable "storage_accounts" {
     primary_blob_endpoint = string
     primary_access_key    = string
   }))
-  sensitive   = true
-  default     = {}
+  sensitive = true
+  default   = {}
 }
 
 variable "servicebus_namespaces" {
@@ -218,7 +226,7 @@ variable "servicebus_namespaces" {
     name     = string
     location = string
   }))
-  default     = {}
+  default = {}
 }
 
 variable "appservice_plans" {
@@ -227,7 +235,7 @@ variable "appservice_plans" {
     id       = string
     location = string
   }))
-  default     = {}
+  default = {}
 }
 
 variable "consumption_appservice_plans" {
@@ -236,7 +244,7 @@ variable "consumption_appservice_plans" {
     id       = string
     location = string
   }))
-  default     = {}
+  default = {}
 }
 
 variable "key_vault_permissions" {

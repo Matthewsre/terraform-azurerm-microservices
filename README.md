@@ -255,19 +255,17 @@ A single Cosmos DB Account will be created if any of the microservices have a co
 ```hcl
 module "microservice" {
   source = "Matthewsre/microservices/azurerm"
-
   ...
-
   microservices = [
     {
       ...
-    
       cosmos_containers = [
         {
           name               = "AppObjectContainer"
           partition_key_path = "/PartitionKey"
           max_throughput     = 0
-        },
+        }
+      ]
     }
   ]
 }
@@ -278,9 +276,7 @@ module "microservice" {
 ```hcl
 module "microservice" {
   source = "Matthewsre/microservices/azurerm"
-
   ...
-
   regions = [
     "westus2",  # <== failover_priority = 0
     "eastus",   # <== failover_priority = 1
@@ -315,19 +311,49 @@ The storage_account_tier and storage_account_replication_type variables are used
 
 A ServiceBus namespace is created in each region specified only if any of the microservices have a queue specified. If no services have queues, then nothing will be created.
 
+```hcl
+module "microservice" {
+  source = "Matthewsre/microservices/azurerm"
+  ...
+  microservices = [
+    {
+      ...
+      queues = [
+        {
+          name       = "request-queue"
+        }
+      ]
+    }
+  ]
+}
+```
+
 The servicebus_sku variable is used for this configuration. 
 
 *ServiceBus region pairing is not yet configurable in this module.*
 
 ## Azure SQL Server (azurerm_mssql_server, azurerm_mssql_elasticpool, azurerm_sql_failover_group)
 
-An Azure SQL Server is created in each region specified only if any of the microservices have sql specified. If no services have queues, then nothing will be created.
+An Azure SQL Server is created in each region specified only if any of the microservices have sql specified. If no services have sql, then nothing will be created.
 
 The options for SQL in each microservice are "server" and "elastic". If any service has the elastic option set, then an elastic pool will also be created.
 
 The storage accounts created in each region will be used when creating the SQL Server.
 
 The login and password will be the same across all regions and stored in the global Key Vault.
+
+```hcl
+module "microservice" {
+  source = "Matthewsre/microservices/azurerm"
+  ...
+  microservices = [
+    {
+      ...
+      sql = "elastic"
+    }
+  ]
+}
+```
 
 The sql_version and sql_minimum_tls_version can be used to configure the server settings.
 
@@ -346,6 +372,20 @@ The options for function in each microservice is "plan" or "consumption". A serv
 An App Service Plan will be created based on the appservice_plan_tier and appservice_plan_size variables if there are any microservices with appservice or function set to "plan".
 
 A separate dynamic App Service Plan will be created if there are any microservices with function set to "consumption".
+
+```hcl
+module "microservice" {
+  source = "Matthewsre/microservices/azurerm"
+  ...
+  microservices = [
+    {
+      ...
+      appservice = "plan"
+      function = "consumption"
+    }
+  ]
+}
+```
 
 
 # Microservice Resources
