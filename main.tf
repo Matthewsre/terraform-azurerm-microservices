@@ -118,7 +118,7 @@ locals {
 
 locals {
   create_resource_group = var.resource_group_name == ""
-  resource_group_name = local.create_resource_group ? azurerm_resource_group.service[0].name : var.resource_group_name
+  resource_group_name   = local.create_resource_group ? azurerm_resource_group.service[0].name : var.resource_group_name
 }
 
 resource "azurerm_resource_group" "service" {
@@ -202,7 +202,6 @@ resource "azurerm_key_vault" "service" {
   }
 
   dynamic "network_acls" {
-    for_each = local.key_vault_network_acls != null ? [local.key_vault_network_acls] : []
 
     content {
       default_action             = local.key_vault_network_acls.default_action
@@ -386,6 +385,7 @@ module "microservice" {
   cosmosdb_account_name           = local.has_cosmos ? azurerm_cosmosdb_account.service[0].name : null
   cosmosdb_sql_database_name      = local.has_cosmos ? azurerm_cosmosdb_sql_database.service[0].name : null
   cosmosdb_endpoint               = local.has_cosmos ? azurerm_cosmosdb_account.service[0].endpoint : null
+  cosmosdb_primary_key            = local.has_cosmos ? azurerm_cosmosdb_account.service[0].primary_key : null
   cosmos_autoscale_max_throughput = var.cosmos_autoscale_max_throughput
   servicebus_namespaces           = azurerm_servicebus_namespace.service
   appservice_plans                = azurerm_app_service_plan.service
