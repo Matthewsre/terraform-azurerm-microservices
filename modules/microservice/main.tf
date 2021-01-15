@@ -145,29 +145,12 @@ resource "azurerm_key_vault" "microservice" {
   }
 }
 
-# resource "azurerm_key_vault_access_policy" "microservice" {
-#   count = local.has_key_vault ? 1 : 0
-
-#   key_vault_id = azurerm_key_vault.microservice[0].id
-#   tenant_id    = var.azurerm_client_config.tenant_id
-#   object_id    = var.azurerm_client_config.object_id
-
-#   certificate_permissions = var.key_vault_permissions.certificate_permissions
-#   key_permissions         = var.key_vault_permissions.key_permissions
-#   secret_permissions      = var.key_vault_permissions.secret_permissions
-#   storage_permissions     = var.key_vault_permissions.storage_permissions
-# }
-
-# resource "azurerm_key_vault_access_policy" "microservice_identity" {
-#   count = local.has_key_vault ? 1 : 0
-
-#   key_vault_id = azurerm_key_vault.microservice[0].id
-#   tenant_id    = var.azurerm_client_config.tenant_id
-#   object_id    = azurerm_user_assigned_identity.microservice_key_vault[0].principal_id
-
-#   key_permissions    = ["get"]
-#   secret_permissions = ["get"]
-# }
+resource "azurerm_key_vault_secret" "cosmos" {
+  count        = local.has_cosmos_container ? 1 : 0
+  name         = "cosmos-primary-key"
+  value        = var.cosmos_primary_key
+  key_vault_id = azurerm_key_vault.microservice[0].id
+}
 
 locals {
   queues = local.has_servicebus_queues ? flatten([for queue in var.queues : [for namespace in var.servicebus_namespaces : { queue = queue, namespace = namespace }]]) : []
@@ -295,16 +278,16 @@ locals {
       "KeyVault:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_key_vault[0].client_id
     } : {},
     local.has_sql_database ? {
-      "Database:ConnectionString"    = "Server=${var.sql_servers[var.primary_region].name}.database.windows.net,1433;Database=${azurerm_mssql_database.microservice_primary[0].name};UID=${azurerm_user_assigned_identity.microservice_sql[0].client_id};Authentication=Active Directory Interactive"
+      "Database:ConnectionString"    = "Server=${var.sql_servers[var.primary_region].fully_qualified_domain_name},1433;Database=${azurerm_mssql_database.microservice_primary[0].name};UID=${azurerm_user_assigned_identity.microservice_sql[0].client_id};Authentication=Active Directory Interactive"
       "Database:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_sql[0].client_id
     } : {},
     local.has_servicebus_queues ? {
-      "ServiceBus:ConnectionString"          = "Endpoint=sb://${var.servicebus_namespaces[var.primary_region].name}.servicebus.windows.net/;Authentication=Managed Identity"
+      "ServiceBus:ConnectionString"    = "Endpoint=sb://${var.servicebus_namespaces[var.primary_region].name}.servicebus.windows.net/;Authentication=Managed Identity"
       "ServiceBus:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_servicebus[0].client_id
     } : {},
     local.has_cosmos_container ? {
-      "DocumentStore:Url"                 = var.cosmosdb_endpoint
-      "DocumentStore:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_cosmos[0].client_id
+      "Cosmos:BaseUri"             = var.cosmosdb_endpoint
+      "Cosmos:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_cosmos[0].client_id
     } : {}
   )
 }

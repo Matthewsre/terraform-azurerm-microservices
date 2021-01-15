@@ -334,7 +334,7 @@ The servicebus_sku variable is used for this configuration.
 
 ## Azure SQL Server (azurerm_mssql_server, azurerm_mssql_elasticpool, azurerm_sql_failover_group)
 
-An Azure SQL Server is created in each region specified only if any of the microservices have sql specified. If no services have queues, then nothing will be created.
+An Azure SQL Server is created in each region specified only if any of the microservices have sql specified. If no services have sql, then nothing will be created.
 
 The options for SQL in each microservice are "server" and "elastic". If any service has the elastic option set, then an elastic pool will also be created.
 
