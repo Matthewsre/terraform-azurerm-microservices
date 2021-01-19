@@ -202,6 +202,7 @@ resource "azurerm_key_vault" "service" {
   }
 
   dynamic "network_acls" {
+    for_each = local.key_vault_network_acls != null ? [local.key_vault_network_acls] : []
 
     content {
       default_action             = local.key_vault_network_acls.default_action
