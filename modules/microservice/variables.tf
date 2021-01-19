@@ -173,7 +173,7 @@ variable "cosmosdb_endpoint" {
   default     = ""
 }
 
-variable "cosmos_primary_key" {
+variable "cosmosdb_primary_key" {
   description = "Cosmos DB Primary Key"
   type        = string
   default     = ""

@@ -148,7 +148,7 @@ resource "azurerm_key_vault" "microservice" {
 resource "azurerm_key_vault_secret" "cosmos" {
   count        = local.has_cosmos_container ? 1 : 0
   name         = "cosmos-primary-key"
-  value        = var.cosmos_primary_key
+  value        = var.cosmosdb_primary_key
   key_vault_id = azurerm_key_vault.microservice[0].id
 }
 
