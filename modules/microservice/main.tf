@@ -95,7 +95,7 @@ resource "azurerm_user_assigned_identity" "microservice_cosmos" {
 resource "azurerm_key_vault" "microservice" {
   count = local.has_key_vault ? 1 : 0
 
-  name                        = "${var.name}-${local.environment_differentiator_short}-${var.environment}"
+  name                        = local.environment_differentiator_short != "" ? "${var.name}-${local.environment_differentiator_short}-${var.environment}" : "${var.name}-${local.environment_differentiator_short}-${var.environment}"
   location                    = var.primary_region
   resource_group_name         = var.resource_group_name
   enabled_for_disk_encryption = true
