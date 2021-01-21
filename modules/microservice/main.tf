@@ -269,25 +269,27 @@ locals {
       "AzureAd:Instance"                           = "https://login.microsoftonline.com/"
       "AzureAd:Domain"                             = "microsoft.onmicrosoft.com"
       "AzureAd:TenantId"                           = var.azurerm_client_config.tenant_id
-      "AzureAd:ClientId"                           = azuread_application.microservice.id
+      "AzureAd:ClientId"                           = azuread_application.microservice.client_id
       "AzureAd:CallbackPath"                       = var.callback_path
-      "ApplicationInsights:InstrumentationKey"     = var.application_insights.instrumentation_key
+      //"AzureAd:SignedOutCallbackPath"              = var.signed_out_callback_path
+      "ApplicationInsights:InstrumentationKey" = var.application_insights.instrumentation_key
     },
     local.has_key_vault ? {
-      "KeyVault:BaseUri"             = azurerm_key_vault.microservice[0].vault_uri
-      "KeyVault:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_key_vault[0].client_id
+      "KeyVault:BaseUri"                 = azurerm_key_vault.microservice[0].vault_uri
+      "KeyVault:ManagedIdentityClientId" = azurerm_user_assigned_identity.microservice_key_vault[0].client_id
     } : {},
     local.has_sql_database ? {
-      "Database:ConnectionString"    = "Server=${var.sql_servers[var.primary_region].fully_qualified_domain_name},1433;Database=${azurerm_mssql_database.microservice_primary[0].name};UID=${azurerm_user_assigned_identity.microservice_sql[0].client_id};Authentication=Active Directory Interactive"
-      "Database:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_sql[0].client_id
+      "Database:ConnectionString"        = "Server=${var.sql_servers[var.primary_region].fully_qualified_domain_name},1433;Database=${azurerm_mssql_database.microservice_primary[0].name};UID=${azurerm_user_assigned_identity.microservice_sql[0].client_id};Authentication=Active Directory Interactive"
+      "Database:ManagedIdentityClientId" = azurerm_user_assigned_identity.microservice_sql[0].client_id
     } : {},
     local.has_servicebus_queues ? {
-      "ServiceBus:ConnectionString"    = "Endpoint=sb://${var.servicebus_namespaces[var.primary_region].name}.servicebus.windows.net/;Authentication=Managed Identity"
-      "ServiceBus:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_servicebus[0].client_id
+      "ServiceBus:ConnectionString"        = "Endpoint=sb://${var.servicebus_namespaces[var.primary_region].name}.servicebus.windows.net/;Authentication=Managed Identity"
+      "ServiceBus:ManagedIdentityClientId" = azurerm_user_assigned_identity.microservice_servicebus[0].client_id
     } : {},
     local.has_cosmos_container ? {
-      "Cosmos:BaseUri"             = var.cosmosdb_endpoint
-      "Cosmos:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_cosmos[0].client_id
+      "Cosmos:BaseUri"                 = var.cosmosdb_endpoint
+      "Cosmos:DatabaseName"            = var.cosmosdb_sql_database_name
+      "Cosmos:ManagedIdentityClientId" = azurerm_user_assigned_identity.microservice_cosmos[0].client_id
     } : {}
   )
 }
