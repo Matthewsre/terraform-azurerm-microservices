@@ -174,6 +174,18 @@ resource "azuread_application" "microservice" {
   owners                     = [var.azurerm_client_config.object_id]
   group_membership_claims    = "None"
   oauth2_permissions         = []
+
+  # Granting required permissions to Microsoft Graph for auth to work
+  # Post used to find the correct "magic" Guids
+  # https://partlycloudy.blog/2019/12/15/fully-automated-creation-of-an-aad-integrated-kubernetes-cluster-with-terraform/
+  required_resource_access {
+    resource_app_id = "00000003-0000-0000-c000-000000000000"
+    resource_access {
+      id   = "e1fe6dd8-ba31-4d61-89e7-88639da4683d"
+      type = "Scope"
+    }
+  }
+
   reply_urls = [
     lower("https://${local.full_microservice_environment_name}.trafficmanager.net/"),
     lower("https://${local.full_microservice_environment_name}.trafficmanager.net${var.callback_path}")
@@ -269,7 +281,7 @@ locals {
       "AzureAd:Instance"                           = "https://login.microsoftonline.com/"
       "AzureAd:Domain"                             = "microsoft.onmicrosoft.com"
       "AzureAd:TenantId"                           = var.azurerm_client_config.tenant_id
-      "AzureAd:ClientId"                           = azuread_application.microservice.client_id
+      "AzureAd:ClientId"                           = azuread_application.microservice.application_id
       "AzureAd:CallbackPath"                       = var.callback_path
       //"AzureAd:SignedOutCallbackPath"              = var.signed_out_callback_path
       "ApplicationInsights:InstrumentationKey" = var.application_insights.instrumentation_key
