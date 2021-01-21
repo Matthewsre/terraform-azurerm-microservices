@@ -116,6 +116,22 @@ locals {
 #### Shared Global Resources ####
 #################################
 
+### Ensure Subcription has required providers
+
+# Need to have an option to add providers that don't exist without tracking them
+
+# locals {
+#   required_providers = [
+#     "Microsoft.ManagedIdentity"
+#   ]
+# }
+
+# resource "azurerm_resource_provider_registration" "microservice" {
+#   for_each = toset(local.required_providers)
+
+#   name = each.value
+# }
+
 locals {
   create_resource_group = var.resource_group_name == ""
   resource_group_name   = local.create_resource_group ? azurerm_resource_group.service[0].name : var.resource_group_name
@@ -408,8 +424,8 @@ resource "time_sleep" "delay_before_traffic" {
     module.microservice
   ]
 
-  create_duration  = "15s"
-  destroy_duration = "15s"
+  create_duration  = "30s"
+  destroy_duration = "30s"
 }
 
 # traffic module was moved to it's own module to reduce/prevent intermittent conflict errors between app services, app functions, slots, and traffic manager

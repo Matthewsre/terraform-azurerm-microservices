@@ -174,6 +174,18 @@ resource "azuread_application" "microservice" {
   owners                     = [var.azurerm_client_config.object_id]
   group_membership_claims    = "None"
   oauth2_permissions         = []
+
+  # Granting required permissions to Microsoft Graph for auth to work
+  # Post used to find the correct "magic" Guids
+  # https://partlycloudy.blog/2019/12/15/fully-automated-creation-of-an-aad-integrated-kubernetes-cluster-with-terraform/
+  required_resource_access {
+    resource_app_id = "00000003-0000-0000-c000-000000000000"
+    resource_access {
+      id   = "e1fe6dd8-ba31-4d61-89e7-88639da4683d"
+      type = "Scope"
+    }
+  }
+
   reply_urls = [
     lower("https://${local.full_microservice_environment_name}.trafficmanager.net/"),
     lower("https://${local.full_microservice_environment_name}.trafficmanager.net${var.callback_path}")
@@ -269,25 +281,27 @@ locals {
       "AzureAd:Instance"                           = "https://login.microsoftonline.com/"
       "AzureAd:Domain"                             = "microsoft.onmicrosoft.com"
       "AzureAd:TenantId"                           = var.azurerm_client_config.tenant_id
-      "AzureAd:ClientId"                           = azuread_application.microservice.id
+      "AzureAd:ClientId"                           = azuread_application.microservice.application_id
       "AzureAd:CallbackPath"                       = var.callback_path
-      "ApplicationInsights:InstrumentationKey"     = var.application_insights.instrumentation_key
+      //"AzureAd:SignedOutCallbackPath"              = var.signed_out_callback_path
+      "ApplicationInsights:InstrumentationKey" = var.application_insights.instrumentation_key
     },
     local.has_key_vault ? {
-      "KeyVault:BaseUri"             = azurerm_key_vault.microservice[0].vault_uri
-      "KeyVault:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_key_vault[0].client_id
+      "KeyVault:BaseUri"                 = azurerm_key_vault.microservice[0].vault_uri
+      "KeyVault:ManagedIdentityClientId" = azurerm_user_assigned_identity.microservice_key_vault[0].client_id
     } : {},
     local.has_sql_database ? {
-      "Database:ConnectionString"    = "Server=${var.sql_servers[var.primary_region].fully_qualified_domain_name},1433;Database=${azurerm_mssql_database.microservice_primary[0].name};UID=${azurerm_user_assigned_identity.microservice_sql[0].client_id};Authentication=Active Directory Interactive"
-      "Database:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_sql[0].client_id
+      "Database:ConnectionString"        = "Server=${var.sql_servers[var.primary_region].fully_qualified_domain_name},1433;Database=${azurerm_mssql_database.microservice_primary[0].name};UID=${azurerm_user_assigned_identity.microservice_sql[0].client_id};Authentication=Active Directory Interactive"
+      "Database:ManagedIdentityClientId" = azurerm_user_assigned_identity.microservice_sql[0].client_id
     } : {},
     local.has_servicebus_queues ? {
-      "ServiceBus:ConnectionString"    = "Endpoint=sb://${var.servicebus_namespaces[var.primary_region].name}.servicebus.windows.net/;Authentication=Managed Identity"
-      "ServiceBus:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_servicebus[0].client_id
+      "ServiceBus:ConnectionString"        = "Endpoint=sb://${var.servicebus_namespaces[var.primary_region].name}.servicebus.windows.net/;Authentication=Managed Identity"
+      "ServiceBus:ManagedIdentityClientId" = azurerm_user_assigned_identity.microservice_servicebus[0].client_id
     } : {},
     local.has_cosmos_container ? {
-      "Cosmos:BaseUri"             = var.cosmosdb_endpoint
-      "Cosmos:ManagedServiceAppId" = azurerm_user_assigned_identity.microservice_cosmos[0].client_id
+      "Cosmos:BaseUri"                 = var.cosmosdb_endpoint
+      "Cosmos:DatabaseName"            = var.cosmosdb_sql_database_name
+      "Cosmos:ManagedIdentityClientId" = azurerm_user_assigned_identity.microservice_cosmos[0].client_id
     } : {}
   )
 }
@@ -406,8 +420,8 @@ resource "time_sleep" "delay_before_creating_slots" {
     azurerm_function_app.microservice
   ]
 
-  create_duration  = "15s"
-  destroy_duration = "15s"
+  create_duration  = "30s"
+  destroy_duration = "30s"
 }
 
 resource "azurerm_app_service_slot" "microservice" {
