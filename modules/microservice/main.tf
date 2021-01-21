@@ -55,21 +55,6 @@ locals {
 #### Microservice Resources ####
 ################################
 
-### Ensure Subcription has required providers
-
-locals {
-  required_providers = [
-    "Microsoft.ManagedIdentity"
-  ]
-}
-
-resource "azurerm_resource_provider_registration" "microservice" {
-  for_each = toset(local.required_providers)
-
-  name = each.value
-}
-
-
 ### Create UserAssigned MSI for resources (KeyVault, Sql, Cosmos, ServiceBus)
 resource "azurerm_user_assigned_identity" "microservice_key_vault" {
   count = local.has_key_vault ? 1 : 0
@@ -435,8 +420,8 @@ resource "time_sleep" "delay_before_creating_slots" {
     azurerm_function_app.microservice
   ]
 
-  create_duration  = "15s"
-  destroy_duration = "15s"
+  create_duration  = "30s"
+  destroy_duration = "30s"
 }
 
 resource "azurerm_app_service_slot" "microservice" {
@@ -483,7 +468,6 @@ resource "azurerm_function_app_slot" "microservice" {
   }
 
   depends_on = [
-    azurerm_resource_provider_registration.microservice,
     azurerm_function_app.microservice,
     time_sleep.delay_before_creating_slots
   ]
