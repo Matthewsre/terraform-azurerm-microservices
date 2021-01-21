@@ -118,17 +118,19 @@ locals {
 
 ### Ensure Subcription has required providers
 
-locals {
-  required_providers = [
-    "Microsoft.ManagedIdentity"
-  ]
-}
+# Need to have an option to add providers that don't exist without tracking them
 
-resource "azurerm_resource_provider_registration" "microservice" {
-  for_each = toset(local.required_providers)
+# locals {
+#   required_providers = [
+#     "Microsoft.ManagedIdentity"
+#   ]
+# }
 
-  name = each.value
-}
+# resource "azurerm_resource_provider_registration" "microservice" {
+#   for_each = toset(local.required_providers)
+
+#   name = each.value
+# }
 
 locals {
   create_resource_group = var.resource_group_name == ""
@@ -408,7 +410,6 @@ module "microservice" {
   consumption_appservice_plans    = azurerm_app_service_plan.service_consumption
 
   depends_on = [
-    azurerm_resource_provider_registration.microservice,
     azurerm_storage_account.service,
     azurerm_servicebus_namespace.service,
     azurerm_cosmosdb_sql_database.service,
