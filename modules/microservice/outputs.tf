@@ -24,3 +24,8 @@ output "application_data" {
     service_consumers = local.consumers
   }
 }
+
+output "appsettings" {
+  description = "AppSettings object to use for optionally creating json files"
+  value       = local.appsettings
+}

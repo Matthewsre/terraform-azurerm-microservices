@@ -273,18 +273,22 @@ resource "azurerm_cosmosdb_sql_container" "microservice" {
 ### Appservice
 
 locals {
+  azuread_authority = "${var.azuread_instance}${var.azurerm_client_config.tenant_id}/v2.0/"
+
   appservice_app_settings = merge(
     {
       "APPINSIGHTS_INSTRUMENTATIONKEY"             = var.application_insights.instrumentation_key
       "APPLICATIONINSIGHTS_CONNECTION_STRING"      = var.application_insights.connection_string
       "ApplicationInsightsAgent_EXTENSION_VERSION" = "~2"
-      "AzureAd:Instance"                           = "https://login.microsoftonline.com/"
-      "AzureAd:Domain"                             = "microsoft.onmicrosoft.com"
+      "AzureAd:Instance"                           = var.azuread_instance
+      "AzureAd:Domain"                             = var.azuread_domain
       "AzureAd:TenantId"                           = var.azurerm_client_config.tenant_id
       "AzureAd:ClientId"                           = azuread_application.microservice.application_id
+      "AzureAd:Audience"                           = azuread_application.microservice.application_id
+      "AzureAd:Authority"                          = local.azuread_authority
       "AzureAd:CallbackPath"                       = var.callback_path
-      //"AzureAd:SignedOutCallbackPath"              = var.signed_out_callback_path
-      "ApplicationInsights:InstrumentationKey" = var.application_insights.instrumentation_key
+      "AzureAd:SignedOutCallbackPath"              = var.signed_out_callback_path
+      "ApplicationInsights:InstrumentationKey"     = var.application_insights.instrumentation_key
     },
     local.has_key_vault ? {
       "KeyVault:BaseUri"                 = azurerm_key_vault.microservice[0].vault_uri
@@ -307,6 +311,53 @@ locals {
 }
 
 locals {
+  appsettings = var.create_appsettings ? merge(
+    {
+      AzureAd = {
+        Instance              = var.azuread_instance
+        Domain                = var.azuread_domain
+        TenantId              = var.azurerm_client_config.tenant_id
+        ClientId              = azuread_application.microservice.application_id
+        Audience              = azuread_application.microservice.application_id
+        Authority             = local.azuread_authority
+        CallbackPath          = var.callback_path
+        SignedOutCallbackPath = var.signed_out_callback_path
+      }
+    },
+    {
+      ApplicationInsights = {
+        InstrumentationKey = var.application_insights.instrumentation_key
+      }
+    },
+    local.has_key_vault ? {
+      KeyVault = {
+        BaseUri                 = azurerm_key_vault.microservice[0].vault_uri
+        ManagedIdentityClientId = azurerm_user_assigned_identity.microservice_key_vault[0].client_id
+      }
+    } : {},
+    local.has_sql_database ? {
+      Database = {
+        ConnectionString        = "Server=${var.sql_servers[var.primary_region].fully_qualified_domain_name},1433;Database=${azurerm_mssql_database.microservice_primary[0].name};UID=${azurerm_user_assigned_identity.microservice_sql[0].client_id};Authentication=Active Directory Interactive"
+        ManagedIdentityClientId = azurerm_user_assigned_identity.microservice_sql[0].client_id
+      }
+    } : {},
+    local.has_servicebus_queues ? {
+      ServiceBus = {
+        ConnectionString        = "Endpoint=sb://${var.servicebus_namespaces[var.primary_region].name}.servicebus.windows.net/;Authentication=Managed Identity"
+        ManagedIdentityClientId = azurerm_user_assigned_identity.microservice_servicebus[0].client_id
+      }
+    } : {},
+    local.has_cosmos_container ? {
+      Cosmos = {
+        BaseUri                 = var.cosmosdb_endpoint
+        DatabaseName            = var.cosmosdb_sql_database_name
+        ManagedIdentityClientId = azurerm_user_assigned_identity.microservice_cosmos[0].client_id
+      }
+    } : {}
+  ) : null
+}
+
+locals {
   appservice_function_app_settings = merge(
     {
       "FUNCTIONS_WORKER_RUNTIME" = "dotnet",
@@ -317,8 +368,6 @@ locals {
     } : {}
   )
 }
-
-
 
 locals {
   user_assigned_identities = concat(

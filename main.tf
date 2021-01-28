@@ -31,7 +31,12 @@ data "azuread_user" "current_user" {
   object_id = data.azurerm_client_config.current.object_id
 }
 
+data "azuread_domains" "default" {
+  only_default = true
+}
+
 locals {
+  azuread_domain                      = data.azuread_domains.default.domains[0].domain_name
   primary_region                      = var.primary_region != "" ? var.primary_region : var.regions[0]
   secondary_region                    = var.secondary_region != "" ? var.secondary_region : length(var.regions) > 1 ? var.regions[1] : null
   service_name                        = lower(var.service_name)
@@ -42,8 +47,8 @@ locals {
   has_queues                          = length({ for microservice in var.microservices : microservice.name => microservice if microservice.queues != null ? length(microservice.queues) > 0 : false }) > 0
   has_sql_server_elastic              = length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "elastic" }) > 0
   has_sql_server                      = local.has_sql_server_elastic || length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "server" }) > 0
-  has_appservice_plan                 = length({ for microservice in var.microservices : microservice.name => microservice if microservice.appservice == "plan" || microservice.function == "plan" }) > 0
-  has_consumption_appservice_plan     = length({ for microservice in var.microservices : microservice.name => microservice if microservice.function == "consumption" }) > 0
+  has_appservice_plan                 = var.exclude_hosts ? false : length({ for microservice in var.microservices : microservice.name => microservice if microservice.appservice == "plan" || microservice.function == "plan" }) > 0
+  has_consumption_appservice_plan     = var.exclude_hosts ? false : length({ for microservice in var.microservices : microservice.name => microservice if microservice.function == "consumption" }) > 0
   servicebus_regions                  = local.has_queues ? lower(var.servicebus_sku) == "premium" ? var.regions : [local.primary_region] : []
   appservice_plan_regions             = local.has_appservice_plan ? var.regions : []
   consumption_appservice_plan_regions = local.has_consumption_appservice_plan ? var.regions : []
@@ -202,7 +207,6 @@ resource "azurerm_key_vault" "service" {
   resource_group_name         = local.resource_group_name
   enabled_for_disk_encryption = true
   tenant_id                   = data.azurerm_client_config.current.tenant_id
-  soft_delete_enabled         = true
   soft_delete_retention_days  = var.retention_in_days
   purge_protection_enabled    = false
   sku_name                    = "standard"
@@ -375,8 +379,12 @@ module "microservice" {
 
   name                            = each.value.name
   service_name                    = local.service_name
+  azuread_domain                  = local.azuread_domain
+  azuread_instance                = var.azuread_instance
   environment                     = var.environment
   environment_differentiator      = local.environment_differentiator
+  create_appsettings              = var.create_appsettings
+  appsettings_path                = var.appsettings_path
   appservice                      = each.value.appservice
   function                        = each.value.function
   sql                             = each.value.sql
@@ -390,6 +398,7 @@ module "microservice" {
   secondary_region                = local.secondary_region
   environment_name                = local.environment_name
   callback_path                   = var.callback_path
+  signed_out_callback_path        = var.signed_out_callback_path
   key_vault_permissions           = var.key_vault_permissions
   key_vault_network_acls          = local.key_vault_network_acls
   azurerm_client_config           = data.azurerm_client_config.current
@@ -431,7 +440,7 @@ resource "time_sleep" "delay_before_traffic" {
 # traffic module was moved to it's own module to reduce/prevent intermittent conflict errors between app services, app functions, slots, and traffic manager
 module "microservice_traffic" {
   source   = "./modules/traffic"
-  for_each = module.microservice
+  for_each = var.exclude_hosts ? {} : module.microservice
 
   name                     = each.value.traffic_data.microservice_environment_name
   resource_group_name      = local.resource_group_name
@@ -465,5 +474,55 @@ resource "azurerm_sql_failover_group" "service" {
   read_write_endpoint_failover_policy {
     mode          = "Automatic"
     grace_minutes = 60
+  }
+}
+
+#### Create JSON files
+
+locals {
+  appsettings = var.create_appsettings ? merge(
+    {
+      ApplicationInsights = {
+        InstrumentationKey = azurerm_application_insights.service.instrumentation_key
+      }
+    },
+    local.has_queues ? {
+      ServiceBus = {
+        ConnectionString = "Endpoint=sb://${azurerm_servicebus_namespace.service[local.primary_region].name}.servicebus.windows.net/;Authentication=Managed Identity"
+      }
+    } : {},
+    local.has_cosmos ? {
+      Cosmos = {
+        BaseUri      = azurerm_cosmosdb_account.service[0].endpoint
+        DatabaseName = azurerm_cosmosdb_sql_database.service[0].name
+      }
+    } : {}
+  ) : null
+}
+
+
+resource "null_resource" "service_json_file" {
+  count = var.create_appsettings ? 1 : 0
+
+  triggers = {
+    trigger = uuid()
+  }
+
+  provisioner "local-exec" {
+    command     = ".'${path.module}/scripts/WriteAppSettings.ps1' '${jsonencode(local.appsettings)}' '${var.appsettings_path}${local.service_name}.machineSettings.json'"
+    interpreter = ["PowerShell", "-Command"]
+  }
+}
+
+resource "null_resource" "microservice_json_file" {
+  for_each = var.create_appsettings ? module.microservice : {}
+
+  triggers = {
+    trigger = uuid()
+  }
+
+  provisioner "local-exec" {
+    command     = ".'${path.module}/scripts/WriteAppSettings.ps1' '${jsonencode(each.value.appsettings)}' '${var.appsettings_path}${var.service_name}.${each.value.name}.appSettings.json'"
+    interpreter = ["PowerShell", "-Command"]
   }
 }
