@@ -479,6 +479,41 @@ resource "azurerm_sql_failover_group" "service" {
 
 #### Create JSON files
 
+locals {
+  appsettings = var.create_appsettings ? merge(
+    {
+      ApplicationInsights = {
+        InstrumentationKey = azurerm_application_insights.service.instrumentation_key
+      }
+    },
+    local.has_queues ? {
+      ServiceBus = {
+        ConnectionString = "Endpoint=sb://${azurerm_servicebus_namespace.service[local.primary_region].name}.servicebus.windows.net/;Authentication=Managed Identity"
+      }
+    } : {},
+    local.has_cosmos ? {
+      Cosmos = {
+        BaseUri      = azurerm_cosmosdb_account.service[0].endpoint
+        DatabaseName = azurerm_cosmosdb_sql_database.service[0].name
+      }
+    } : {}
+  ) : null
+}
+
+
+resource "null_resource" "service_json_file" {
+  count = var.create_appsettings ? 1 : 0
+
+  triggers = {
+    trigger = uuid()
+  }
+
+  provisioner "local-exec" {
+    command     = ".'${path.module}/scripts/WriteAppSettings.ps1' '${jsonencode(local.appsettings)}' '${var.appsettings_path}${local.service_name}.machineSettings.json'"
+    interpreter = ["PowerShell", "-Command"]
+  }
+}
+
 resource "null_resource" "microservice_json_file" {
   for_each = var.create_appsettings ? module.microservice : {}
 
