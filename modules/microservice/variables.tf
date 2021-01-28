@@ -49,6 +49,18 @@ variable "environment" {
   }
 }
 
+variable "create_appsettings" {
+  description = "Enable this to write appsettings json files. This is useful for a dev environment where hosting will be done locally."
+  type        = bool
+  default     = false
+}
+
+variable "appsettings_path" {
+  description = "Path to create appsettings json files."
+  type        = string
+  default     = "C:\\dev\\"
+}
+
 variable "environment_name" {
   description = "Name of the environment including differentiator"
   type        = string
@@ -62,6 +74,11 @@ variable "roles" {
 
 variable "callback_path" {
   description = "Callback path for authorization"
+  type        = string
+}
+
+variable "signed_out_callback_path" {
+  description = "Signed out callback path for authorization"
   type        = string
 }
 
@@ -107,6 +124,17 @@ variable "http" {
     consumers = optional(list(string))
   })
   default = null
+}
+
+variable "azuread_instance" {
+  description = "Instance of Azure AD"
+  type        = string
+  default     = "https://login.microsoftonline.com/"
+}
+
+variable "azuread_domain" {
+  description = "Instance of Azure AD"
+  type        = string
 }
 
 variable "sql_servers" {

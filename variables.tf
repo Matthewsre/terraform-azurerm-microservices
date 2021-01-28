@@ -13,6 +13,24 @@ variable "environment" {
   }
 }
 
+variable "exclude_hosts" {
+  description = "Enable this to exclude creating app services and functions. This is useful for a dev environment where hosting will be done locally."
+  type        = bool
+  default     = false
+}
+
+variable "create_appsettings" {
+  description = "Enable this to write appsettings json files. This is useful for a dev environment where hosting will be done locally."
+  type        = bool
+  default     = false
+}
+
+variable "appsettings_path" {
+  description = "Path to create appsettings json files."
+  type        = string
+  default     = "C:\\dev\\"
+}
+
 variable "ip_address" {
   description = "IP Address that will be used for dev environments to add to firewall rules"
   type        = string
@@ -47,6 +65,12 @@ variable "callback_path" {
   type        = string
   default     = "/signin-oidc"
 }
+variable "signed_out_callback_path" {
+  description = "Signed out callback path for authorization"
+  type        = string
+  default     = "/signout-callback-oidc"
+}
+
 
 # opened bug for lists with optional values https://github.com/hashicorp/terraform/issues/27374
 # this impacts cosmos_containers.max_throughput
@@ -95,23 +119,29 @@ variable "regions" {
   }
 }
 
+variable "azuread_instance" {
+  description = "Instance of Azure AD"
+  type        = string
+  default     = "https://login.microsoftonline.com/"
+}
+
 ### Resource Group Variables
 variable "resource_group_name" {
   description = "Optional existing resource group to deploy resources into."
-  type    = string
-  default = ""
+  type        = string
+  default     = ""
 }
 
 variable "resource_group_name_override" {
   description = "Optional name override to use in creating the new resource group. This value is ignored when a resource_group_name for an existing resource group is provided."
-  type    = string
-  default = ""
+  type        = string
+  default     = ""
 }
 
 variable "resource_group_tags" {
   description = "Tags that will be applied to the resource group."
-  type    = map(string)
-  default = {}
+  type        = map(string)
+  default     = {}
 }
 
 ### Application Insights Variables
@@ -197,13 +227,13 @@ variable "sql_elasticpool_max_size_gb" {
 
 variable "sql_elasticpool_sku" {
   description = "SQL Server elasticpool sku"
-  type        = object({
+  type = object({
     name     = string
     tier     = string
     capacity = number
     family   = optional(string)
   })
-  default     = {
+  default = {
     name     = "BasicPool"
     tier     = "Basic"
     capacity = 50
@@ -212,11 +242,11 @@ variable "sql_elasticpool_sku" {
 
 variable "sql_elasticpool_per_database_settings" {
   description = "SQL Server elasticpool database settings"
-  type        = object({
+  type = object({
     min_capacity = number
     max_capacity = number
   })
-  default     = {
+  default = {
     min_capacity = 5
     max_capacity = 5
   }
