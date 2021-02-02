@@ -5,6 +5,7 @@ terraform {
 
 provider "azurerm" {
   use_msi                    = var.use_msi_to_authenticate
+  environment                = var.azure_environment
   skip_provider_registration = true
   features {
     key_vault {
