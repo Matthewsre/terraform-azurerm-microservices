@@ -1,6 +1,13 @@
 terraform {
   required_version = ">= 0.14"
   experiments      = [module_variable_optional_attrs]
+
+  required_providers {
+    azurerm = {
+      version = ">= 2"
+      source  = "hashicorp/azurerm"
+    }
+  }
 }
 
 #########################
@@ -100,7 +107,6 @@ resource "azurerm_key_vault" "microservice" {
   resource_group_name         = var.resource_group_name
   enabled_for_disk_encryption = true
   tenant_id                   = var.azurerm_client_config.tenant_id
-  soft_delete_enabled         = true
   soft_delete_retention_days  = var.retention_in_days
   purge_protection_enabled    = false
   sku_name                    = "standard"
