@@ -8,6 +8,7 @@ on:
 
 jobs:
   build:
+    name: Validate Terraform Code
     runs-on: windows-latest
 
     steps:
