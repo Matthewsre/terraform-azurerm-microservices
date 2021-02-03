@@ -4,6 +4,17 @@ variable "use_msi_to_authenticate" {
   default     = false
 }
 
+variable "azure_environment" {
+  description = "Type of Azure Environment being deployed to"
+  type        = string
+  default     = "public"
+  validation {
+    condition     = contains(["public", "china", "german", "stack", "usgovernment"], lower(var.azure_environment))
+    error_message = "Environment must be a valid Azure Environment."
+    # See https://www.terraform.io/docs/language/settings/backends/azurerm.html#environment for more info
+  }
+}
+
 variable "environment" {
   description = "Terrform environment we're acting in"
   type        = string
