@@ -9,8 +9,8 @@ variable "azure_environment" {
   type        = string
   default     = "public"
   validation {
-    condition     = contains(["public", "china", "german", "stack",  "usgovernment"])
-    error_message = "Environment must be a valid Azure Environment"
+    condition     = contains(["public", "china", "german", "stack", "usgovernment"], lower(var.azure_environment))
+    error_message = "Environment must be a valid Azure Environment."
     # See https://www.terraform.io/docs/language/settings/backends/azurerm.html#environment for more info
   }
 }
