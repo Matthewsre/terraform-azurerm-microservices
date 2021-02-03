@@ -516,7 +516,7 @@ resource "null_resource" "service_json_file" {
   }
 
   provisioner "local-exec" {
-    command     = ".'${path.module}/scripts/WriteAppSettings.ps1' '${jsonencode(local.appsettings)}' '${var.appsettings_path}${local.service_name}.machineSettings.json'"
+    command     = ".'${path.module}/scripts/Write-AppSettings.ps1' '${jsonencode(local.appsettings)}' '${var.appsettings_path}${local.service_name}.machineSettings.json'"
     interpreter = ["PowerShell", "-Command"]
   }
 }
@@ -529,7 +529,7 @@ resource "null_resource" "microservice_json_file" {
   }
 
   provisioner "local-exec" {
-    command     = ".'${path.module}/scripts/WriteAppSettings.ps1' '${jsonencode(each.value.appsettings)}' '${var.appsettings_path}${var.service_name}.${each.value.name}.appSettings.json'"
+    command     = ".'${path.module}/scripts/Write-AppSettings.ps1' '${jsonencode(each.value.appsettings)}' '${var.appsettings_path}${var.service_name}.${each.value.name}.appSettings.json'"
     interpreter = ["PowerShell", "-Command"]
   }
 }
