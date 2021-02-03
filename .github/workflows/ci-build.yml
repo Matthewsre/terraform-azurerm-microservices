@@ -6,21 +6,20 @@ on:
   pull_request:
     branches: '**'
 
-  jobs:
-
+jobs:
   build:
-    runs-on: windows-latest
+  runs-on: windows-latest
 
-    steps:
-      - uses: actions/checkout@v2
-      - uses: hashicorp/setup-terraform@v1
-        with:
-          terraform_version: 0.14.5
+  steps:
+    - uses: actions/checkout@v2
+    - uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_version: 0.14.5
 
-      - name: Terraform Init
-        id: init
-        run: terraform init -backend=false
+    - name: Terraform Init
+      id: init
+      run: terraform init -backend=false
 
-      - name: Terraform Validate
-        id: validate
-        run: terraform validate -no-color
+    - name: Terraform Validate
+      id: validate
+      run: terraform validate -no-color
