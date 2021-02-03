@@ -56,6 +56,7 @@ locals {
   sql_server_regions                  = local.has_sql_server ? local.secondary_region != null ? [local.primary_region, local.secondary_region] : [local.primary_region] : []
   sql_server_elastic_regions          = local.has_sql_server_elastic ? local.sql_server_regions : []
   admin_login                         = "${var.service_name}-admin"
+  has_sql_admin                       = var.sql_azuread_administrator != ""
 
   include_ip_address = var.key_vault_include_ip_address == null ? local.is_dev : var.key_vault_include_ip_address == true
   lookup_ip_address  = local.include_ip_address && var.ip_address == ""
@@ -289,6 +290,12 @@ resource "azurerm_key_vault_secret" "sql_admin_password" {
   key_vault_id = azurerm_key_vault.service.id
 }
 
+resource "azuread_group" "sql_admin" {
+
+  count        = local.has_sql_admin ? 0 : 1
+  display_name = "A-AD-Group"
+}
+
 resource "azurerm_mssql_server" "service" {
   for_each = toset(local.sql_server_regions)
 
@@ -301,10 +308,10 @@ resource "azurerm_mssql_server" "service" {
   minimum_tls_version          = var.sql_minimum_tls_version
 
   #TODO: determine if we should  set the admin
-  #   azuread_administrator {
-  #     login_username = "AzureAD Admin"
-  #     object_id      = "00000000-0000-0000-0000-000000000000"
-  #   }
+  azuread_administrator {
+    login_username = "AzureAD Admin"
+    object_id      = var.sql_azuread_administrator
+  }
 
 }
 
