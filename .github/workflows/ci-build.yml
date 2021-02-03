@@ -20,7 +20,7 @@ jobs:
         id: init
         run: terraform init -backend=false
 
-      - name: Terraform Validate
-        id: validate
-        run: terraform validate -no-color
+      - run: echo ${{ steps.init.outputs.stdout }}
+      - run: echo ${{ steps.init.outputs.stderr }}
+      - run: echo ${{ steps.init.outputs.exitcode }}
 
