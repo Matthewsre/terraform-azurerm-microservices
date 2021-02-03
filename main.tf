@@ -298,9 +298,11 @@ resource "azurerm_key_vault_secret" "sql_admin_password" {
 }
 
 resource "azuread_group" "sql_admin" {
-
   count        = local.has_sql_admin ? 0 : 1
-  display_name = "A-AD-Group"
+  display_name = "${local.admin_login}-sql"
+}
+locals {
+  sql_azuread_administrator = local.has_sql_admin ? var.sql_azuread_administrator : azuread_group.sql_admin[0].id
 }
 
 resource "azurerm_mssql_server" "service" {
@@ -317,7 +319,7 @@ resource "azurerm_mssql_server" "service" {
   #TODO: determine if we should  set the admin
   azuread_administrator {
     login_username = "AzureAD Admin"
-    object_id      = var.sql_azuread_administrator
+    object_id      = local.sql_azuread_administrator
   }
 
 }

@@ -211,6 +211,12 @@ variable "sql_version" {
   default     = "12.0"
 }
 
+variable "sql_azuread_administrator" {
+  description = "SQL Server AAD admin object id "
+  type        = string
+  default     = ""
+}
+
 variable "sql_minimum_tls_version" {
   description = "SQL Server minimum TLS version"
   type        = string
