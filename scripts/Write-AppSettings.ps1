@@ -9,6 +9,6 @@ if (!(Get-Module -ListAvailable -Name Newtonsoft.Json)) {
 
 Import-Module Newtonsoft.Json
 
-$jsonAppSettings = ConvertFrom-Json $appSettings 
+$jsonAppSettings = ConvertFrom-JsonNewtonsoft $appSettings 
 If (!(Test-Path $filePath)) { New-Item -Path $filePath -Force }
-$jsonAppSettings | ConvertTo-Json -depth 100 | Out-File $filePath
+$jsonAppSettings | ConvertTo-JsonNewtonsoft | Out-File $filePath

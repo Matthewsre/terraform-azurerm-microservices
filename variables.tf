@@ -311,6 +311,12 @@ variable "key_vault_include_ip_address" {
   default     = null
 }
 
+variable "key_vault_developer_user_principal_names" {
+  description = "Provides user account UPNs that will be able to retrieve KeyVault secrets. This will only be used for 'dev' environments"
+  type        = list(string)
+  default     = []
+}
+
 variable "key_vault_network_acls" {
   description = "Defines the default network acls for key vaults"
   type = object({
