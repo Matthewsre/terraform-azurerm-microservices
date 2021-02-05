@@ -211,6 +211,12 @@ variable "sql_version" {
   default     = "12.0"
 }
 
+variable "sql_azuread_administrator" {
+  description = "SQL Server AAD admin object id "
+  type        = string
+  default     = ""
+}
+
 variable "sql_minimum_tls_version" {
   description = "SQL Server minimum TLS version"
   type        = string
@@ -303,6 +309,12 @@ variable "key_vault_include_ip_address" {
   description = "Defines if the current ip should be included in the default network acls for key vaults"
   type        = bool
   default     = null
+}
+
+variable "key_vault_developer_user_principal_names" {
+  description = "Provides user account UPNs that will be able to retrieve KeyVault secrets. This will only be used for 'dev' environments"
+  type        = list(string)
+  default     = []
 }
 
 variable "key_vault_network_acls" {
