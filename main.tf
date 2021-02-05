@@ -63,7 +63,7 @@ locals {
   sql_server_regions                       = local.has_sql_server ? local.secondary_region != null ? [local.primary_region, local.secondary_region] : [local.primary_region] : []
   sql_server_elastic_regions               = local.has_sql_server_elastic ? local.sql_server_regions : []
   admin_login                              = "${var.service_name}-admin"
-  has_sql_admin                            = var.sql_azuread_administrator != ""
+  has_sql_admin                            = local.has_sql_server && var.sql_azuread_administrator != ""
   key_vault_developer_user_principal_names = local.is_dev ? var.key_vault_developer_user_principal_names : []
   has_key_vault_developers                 = length(local.key_vault_developer_user_principal_names) > 0
 
