@@ -181,7 +181,7 @@ resource "azurerm_servicebus_queue" "microservice" {
 ### AAD Application
 
 resource "azuread_application" "microservice" {
-  name                       = local.full_microservice_environment_name
+  display_name               = local.full_microservice_environment_name
   prevent_duplicate_names    = true
   oauth2_allow_implicit_flow = true
   identifier_uris            = [lower("https://${local.full_microservice_environment_name}.trafficmanager.net/")]
