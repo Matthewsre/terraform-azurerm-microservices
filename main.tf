@@ -63,7 +63,7 @@ locals {
   sql_server_regions                       = local.has_sql_server ? local.secondary_region != null ? [local.primary_region, local.secondary_region] : [local.primary_region] : []
   sql_server_elastic_regions               = local.has_sql_server_elastic ? local.sql_server_regions : []
   admin_login                              = "${var.service_name}-admin"
-  has_sql_admin                            = local.has_sql_server && var.sql_azuread_administrator != ""
+  has_sql_admin                            = var.sql_azuread_administrator != ""
   key_vault_developer_user_principal_names = local.is_dev ? var.key_vault_developer_user_principal_names : []
   has_key_vault_developers                 = length(local.key_vault_developer_user_principal_names) > 0
 
@@ -310,11 +310,11 @@ resource "azurerm_key_vault_secret" "sql_admin_password" {
 }
 
 resource "azuread_group" "sql_admin" {
-  count        = local.has_sql_admin ? 0 : 1
+  count        = local.has_sql_server && !local.has_sql_admin ? 1 : 0
   display_name = "${local.admin_login}-sql"
 }
 locals {
-  sql_azuread_administrator = local.has_sql_admin ? var.sql_azuread_administrator : azuread_group.sql_admin[0].id
+  sql_azuread_administrator = length(azuread_group.sql_admin) == 0 ? var.sql_azuread_administrator : azuread_group.sql_admin[0].id
 }
 
 resource "azurerm_mssql_server" "service" {
