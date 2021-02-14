@@ -301,3 +301,13 @@ variable "key_vault_network_acls" {
   })
   default = null
 }
+
+variable "static_site" { 
+  description = "Defines the static site settings"
+  type = object({
+      index_document    = string
+      error_document    = optional(string)
+      domain            = optional(string)
+    })
+  default = null
+}

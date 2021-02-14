@@ -446,6 +446,7 @@ module "microservice" {
   appservice_plans                = azurerm_app_service_plan.service
   appservice_deployment_slots     = var.appservice_deployment_slots
   consumption_appservice_plans    = azurerm_app_service_plan.service_consumption
+  static_site                     = each.value.static_site
 
   depends_on = [
     azurerm_storage_account.service,

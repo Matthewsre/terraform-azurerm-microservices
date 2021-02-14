@@ -106,6 +106,11 @@ variable "microservices" {
       partition_key_path = string
       max_throughput     = number
     })))
+    static_site = optional(object({
+      index_document    = string
+      error_document    = optional(string)
+      domain            = optional(string)
+    }))
   }))
 }
 
