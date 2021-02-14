@@ -275,6 +275,12 @@ variable "consumption_appservice_plans" {
   default = {}
 }
 
+variable "key_vault_user_ids" {
+  description = "User ids that will be granted read access to KeyVault"
+  type        = list(string)
+  default     = []
+}
+
 variable "key_vault_permissions" {
   description = "Permissions applied to Key Vault for the provisioning account"
   type = object({

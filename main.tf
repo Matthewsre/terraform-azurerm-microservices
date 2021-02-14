@@ -44,25 +44,28 @@ data "azuread_domains" "default" {
 }
 
 locals {
-  azuread_domain                      = data.azuread_domains.default.domains[0].domain_name
-  primary_region                      = var.primary_region != "" ? var.primary_region : var.regions[0]
-  secondary_region                    = var.secondary_region != "" ? var.secondary_region : length(var.regions) > 1 ? var.regions[1] : null
-  service_name                        = lower(var.service_name)
-  environment_name                    = local.is_dev ? "${local.environment_differentiator}-${var.environment}" : var.environment
-  service_environment_name            = local.is_dev ? "${var.service_name}-${local.environment_differentiator}-${var.environment}" : "${var.service_name}-${var.environment}"
-  environment_differentiator          = var.environment_differentiator != "" ? var.environment_differentiator : local.is_dev && length(data.azuread_user.current_user) > 0 ? replace(split(".", split("_", split("#EXT#", data.azuread_user.current_user[0].mail_nickname)[0])[0])[0], "-", "") : ""
-  has_cosmos                          = length({ for microservice in var.microservices : microservice.name => microservice if microservice.cosmos_containers != null ? length(microservice.cosmos_containers) > 0 : false }) > 0
-  has_queues                          = length({ for microservice in var.microservices : microservice.name => microservice if microservice.queues != null ? length(microservice.queues) > 0 : false }) > 0
-  has_sql_server_elastic              = length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "elastic" }) > 0
-  has_sql_server                      = local.has_sql_server_elastic || length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "server" }) > 0
-  has_appservice_plan                 = var.exclude_hosts ? false : length({ for microservice in var.microservices : microservice.name => microservice if microservice.appservice == "plan" || microservice.function == "plan" }) > 0
-  has_consumption_appservice_plan     = var.exclude_hosts ? false : length({ for microservice in var.microservices : microservice.name => microservice if microservice.function == "consumption" }) > 0
-  servicebus_regions                  = local.has_queues ? lower(var.servicebus_sku) == "premium" ? var.regions : [local.primary_region] : []
-  appservice_plan_regions             = local.has_appservice_plan ? var.regions : []
-  consumption_appservice_plan_regions = local.has_consumption_appservice_plan ? var.regions : []
-  sql_server_regions                  = local.has_sql_server ? local.secondary_region != null ? [local.primary_region, local.secondary_region] : [local.primary_region] : []
-  sql_server_elastic_regions          = local.has_sql_server_elastic ? local.sql_server_regions : []
-  admin_login                         = "${var.service_name}-admin"
+  azuread_domain                           = data.azuread_domains.default.domains[0].domain_name
+  primary_region                           = var.primary_region != "" ? var.primary_region : var.regions[0]
+  secondary_region                         = var.secondary_region != "" ? var.secondary_region : length(var.regions) > 1 ? var.regions[1] : null
+  service_name                             = lower(var.service_name)
+  environment_name                         = local.is_dev ? "${local.environment_differentiator}-${var.environment}" : var.environment
+  service_environment_name                 = local.is_dev ? "${var.service_name}-${local.environment_differentiator}-${var.environment}" : "${var.service_name}-${var.environment}"
+  environment_differentiator               = var.environment_differentiator != "" ? var.environment_differentiator : local.is_dev && length(data.azuread_user.current_user) > 0 ? replace(split(".", split("_", split("#EXT#", data.azuread_user.current_user[0].mail_nickname)[0])[0])[0], "-", "") : ""
+  has_cosmos                               = length({ for microservice in var.microservices : microservice.name => microservice if microservice.cosmos_containers != null ? length(microservice.cosmos_containers) > 0 : false }) > 0
+  has_queues                               = length({ for microservice in var.microservices : microservice.name => microservice if microservice.queues != null ? length(microservice.queues) > 0 : false }) > 0
+  has_sql_server_elastic                   = length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "elastic" }) > 0
+  has_sql_server                           = local.has_sql_server_elastic || length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "server" }) > 0
+  has_appservice_plan                      = var.exclude_hosts ? false : length({ for microservice in var.microservices : microservice.name => microservice if microservice.appservice == "plan" || microservice.function == "plan" }) > 0
+  has_consumption_appservice_plan          = var.exclude_hosts ? false : length({ for microservice in var.microservices : microservice.name => microservice if microservice.function == "consumption" }) > 0
+  servicebus_regions                       = local.has_queues ? lower(var.servicebus_sku) == "premium" ? var.regions : [local.primary_region] : []
+  appservice_plan_regions                  = local.has_appservice_plan ? var.regions : []
+  consumption_appservice_plan_regions      = local.has_consumption_appservice_plan ? var.regions : []
+  sql_server_regions                       = local.has_sql_server ? local.secondary_region != null ? [local.primary_region, local.secondary_region] : [local.primary_region] : []
+  sql_server_elastic_regions               = local.has_sql_server_elastic ? local.sql_server_regions : []
+  admin_login                              = "${var.service_name}-admin"
+  has_sql_admin                            = var.sql_azuread_administrator != ""
+  key_vault_developer_user_principal_names = local.is_dev ? var.key_vault_developer_user_principal_names : []
+  has_key_vault_developers                 = length(local.key_vault_developer_user_principal_names) > 0
 
   include_ip_address = var.key_vault_include_ip_address == null ? local.is_dev : var.key_vault_include_ip_address == true
   lookup_ip_address  = local.include_ip_address && var.ip_address == ""
@@ -76,6 +79,16 @@ locals {
   # 24 characters is used for max key vault name
   max_environment_differentiator_short2 = local.max_storage_name_length - (length(local.service_name) + length(var.environment) + 2)
   environment_differentiator_short2     = local.max_environment_differentiator_short2 > 0 ? length(local.environment_differentiator) <= local.max_environment_differentiator_short2 ? local.environment_differentiator : substr(local.environment_differentiator, 0, local.max_environment_differentiator_short2) : ""
+}
+
+data "azuread_users" "key_vault_users" {
+  count = local.has_key_vault_developers ? 1 : 0
+
+  user_principal_names = local.key_vault_developer_user_principal_names
+}
+
+locals {
+  key_vault_user_ids = local.has_key_vault_developers ? data.azuread_users.key_vault_users[0].object_ids : []
 }
 
 # Commenting out the external http request dependency in favor of powershell method for looking up IP
@@ -296,6 +309,14 @@ resource "azurerm_key_vault_secret" "sql_admin_password" {
   key_vault_id = azurerm_key_vault.service.id
 }
 
+resource "azuread_group" "sql_admin" {
+  count        = local.has_sql_server && !local.has_sql_admin ? 1 : 0
+  display_name = "${local.admin_login}-sql"
+}
+locals {
+  sql_azuread_administrator = length(azuread_group.sql_admin) == 0 ? var.sql_azuread_administrator : azuread_group.sql_admin[0].id
+}
+
 resource "azurerm_mssql_server" "service" {
   for_each = toset(local.sql_server_regions)
 
@@ -307,11 +328,10 @@ resource "azurerm_mssql_server" "service" {
   version                      = var.sql_version
   minimum_tls_version          = var.sql_minimum_tls_version
 
-  #TODO: determine if we should  set the admin
-  #   azuread_administrator {
-  #     login_username = "AzureAD Admin"
-  #     object_id      = "00000000-0000-0000-0000-000000000000"
-  #   }
+  azuread_administrator {
+    login_username = "AzureAD Admin"
+    object_id      = local.sql_azuread_administrator
+  }
 
 }
 
@@ -407,6 +427,7 @@ module "microservice" {
   environment_name                = local.environment_name
   callback_path                   = var.callback_path
   signed_out_callback_path        = var.signed_out_callback_path
+  key_vault_user_ids              = local.key_vault_user_ids
   key_vault_permissions           = var.key_vault_permissions
   key_vault_network_acls          = local.key_vault_network_acls
   azurerm_client_config           = data.azurerm_client_config.current

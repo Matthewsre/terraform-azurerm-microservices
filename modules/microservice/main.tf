@@ -24,7 +24,7 @@ locals {
   function_appservice_plans          = var.function == "plan" ? var.appservice_plans : var.function == "consumption" ? var.consumption_appservice_plans : {}
   has_sql_database                   = var.sql == "server" || var.sql == "elastic"
   has_primary_sql_server             = local.has_sql_database ? contains(keys(var.sql_servers), var.primary_region) : false
-  has_secondary_sql_server           = local.has_sql_database ? contains(keys(var.sql_servers), var.secondary_region) : false
+  has_secondary_sql_server           = local.has_sql_database && var.secondary_region != null ? contains(keys(var.sql_servers), var.secondary_region) : false
   has_servicebus_queues              = var.queues != null && length(var.queues) > 0
   has_cosmos_container               = length(var.cosmos_containers) > 0
   has_http                           = var.http != null
@@ -98,6 +98,10 @@ resource "azurerm_user_assigned_identity" "microservice_cosmos" {
   location            = var.primary_region
 }
 
+locals {
+  key_vault_read_access_ids = local.has_key_vault ? concat([azurerm_user_assigned_identity.microservice_key_vault[0].principal_id], var.key_vault_user_ids) : []
+}
+
 ### Key Vault
 resource "azurerm_key_vault" "microservice" {
   count = local.has_key_vault ? 1 : 0
@@ -121,12 +125,16 @@ resource "azurerm_key_vault" "microservice" {
     storage_permissions     = var.key_vault_permissions.storage_permissions
   }
 
-  access_policy {
-    tenant_id = var.azurerm_client_config.tenant_id
-    object_id = azurerm_user_assigned_identity.microservice_key_vault[0].principal_id
+  dynamic "access_policy" {
+    for_each = local.key_vault_read_access_ids
 
-    key_permissions    = ["get"]
-    secret_permissions = ["get"]
+    content {
+      tenant_id = var.azurerm_client_config.tenant_id
+      object_id = access_policy.value
+
+      key_permissions    = ["get"]
+      secret_permissions = ["get"]
+    }
   }
 
   # access_policy {
@@ -173,7 +181,7 @@ resource "azurerm_servicebus_queue" "microservice" {
 ### AAD Application
 
 resource "azuread_application" "microservice" {
-  name                       = local.full_microservice_environment_name
+  display_name               = local.full_microservice_environment_name
   prevent_duplicate_names    = true
   oauth2_allow_implicit_flow = true
   identifier_uris            = [lower("https://${local.full_microservice_environment_name}.trafficmanager.net/")]
