@@ -447,6 +447,10 @@ module "microservice" {
   appservice_deployment_slots     = var.appservice_deployment_slots
   consumption_appservice_plans    = azurerm_app_service_plan.service_consumption
   static_site                     = each.value.static_site
+  static_site_kind                = var.static_site_kind
+  static_site_tier                = var.static_site_tier
+  static_site_replication_type    = var.static_site_replication_type
+  static_site_tls_version         = var.static_site_tls_version
 
   depends_on = [
     azurerm_storage_account.service,
