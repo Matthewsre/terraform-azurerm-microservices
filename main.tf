@@ -446,11 +446,15 @@ module "microservice" {
   appservice_plans                = azurerm_app_service_plan.service
   appservice_deployment_slots     = var.appservice_deployment_slots
   consumption_appservice_plans    = azurerm_app_service_plan.service_consumption
-  static_site                     = each.value.static_site
-  static_site_kind                = var.static_site_kind
-  static_site_tier                = var.static_site_tier
-  static_site_replication_type    = var.static_site_replication_type
-  static_site_tls_version         = var.static_site_tls_version
+  static_site                     = each.value.static_site != null ? {
+                                        index_document              = each.value.static_site.index_document
+                                        error_document              = each.value.static_site.error_document
+                                        domain                      = each.value.static_site.domain
+                                        storage_kind                = coalesce(each.value.static_site.storage_kind,var.static_site_kind)
+                                        storage_tier                = coalesce(each.value.static_site.storage_tier,var.static_site_tier)
+                                        storage_replication_type    = coalesce(each.value.static_site.storage_replication_type,var.static_site_replication_type)
+                                        storage_tls_version         = coalesce(each.value.static_site.storage_tls_version,var.static_site_tls_version)
+                                      }: null
 
   depends_on = [
     azurerm_storage_account.service,

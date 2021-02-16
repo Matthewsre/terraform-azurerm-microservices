@@ -107,9 +107,13 @@ variable "microservices" {
       max_throughput     = number
     })))
     static_site = optional(object({
-      index_document    = string
-      error_document    = optional(string)
-      domain            = optional(string)
+      index_document                = string
+      error_document                = optional(string)
+      domain                        = optional(string)
+      storage_kind                  = optional(string)
+      storage_tier                  = optional(string)
+      storage_replication_type      = optional(string)
+      storage_tls_version           = optional(string)
     }))
   }))
 }

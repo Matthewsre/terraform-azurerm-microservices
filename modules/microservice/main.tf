@@ -548,11 +548,11 @@ resource "azurerm_function_app_slot" "microservice" {
   name                      = local.environment_differentiator_short_withservice != "" ? "${var.service_name}${var.name}${local.environment_differentiator_short_withservice}${var.environment}" : "${var.service_name}${var.name}${var.environment}"
   resource_group_name       = var.resource_group_name
   location                  = var.primary_region
-  account_kind              = var.static_site_kind
-  account_tier              = var.static_site_tier
-  account_replication_type  = var.static_site_replication_type
+  account_kind              = var.static_site.storage_kind
+  account_tier              = var.static_site.storage_tier
+  account_replication_type  = var.static_site.storage_replication_type
   enable_https_traffic_only = true
-  min_tls_version           = var.static_site_tls_version
+  min_tls_version           = var.static_site.storage_tls_version
   custom_domain {
     name                    = var.static_site.domain != null ? var.static_site.domain : ""
   }

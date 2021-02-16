@@ -305,30 +305,13 @@ variable "key_vault_network_acls" {
 variable "static_site" { 
   description = "Defines the static site settings"
   type = object({
-      index_document    = string
-      error_document    = optional(string)
-      domain            = optional(string)
+      index_document                = string
+      error_document                = optional(string)
+      domain                        = optional(string)
+      storage_kind                  = optional(string)
+      storage_tier                  = optional(string)
+      storage_replication_type      = optional(string)
+      storage_tls_version           = optional(string)
     })
   default = null
-}
-
-variable "static_site_kind" {
-  description = "Kind of storage account to use for static site"
-  type        = string
-}
-
-
-variable "static_site_tier" {
-  description = "Tier to use for static site"
-  type        = string
-}
-
-variable "static_site_replication_type" {
-  description = "Defines the type of replication to use for the static site"
-  type        = string
-}
-
-variable "static_site_tls_version" {
-  description = "Defines the type of replication to use for the static site"
-  type        = string
 }
