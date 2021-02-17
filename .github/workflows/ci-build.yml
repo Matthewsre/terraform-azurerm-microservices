@@ -1,0 +1,28 @@
+name: CI Build
+
+on:
+  push:
+    branches: '**'
+  pull_request:
+    branches: '**'
+
+jobs:
+  build:
+    name: Validate Terraform Code
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 0.14.5
+          terraform_wrapper: false
+        
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend=false
+   
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate
+
