@@ -306,12 +306,12 @@ variable "static_site" {
   description = "Defines the static site settings"
   type = object({
       index_document                = string
-      error_document                = optional(string)
-      domain                        = optional(string)
-      storage_kind                  = optional(string)
-      storage_tier                  = optional(string)
-      storage_replication_type      = optional(string)
-      storage_tls_version           = optional(string)
+      error_document                = string
+      domain                        = string
+      storage_kind                  = string
+      storage_tier                  = string
+      storage_replication_type      = string
+      storage_tls_version           = string
     })
   default = null
 }
