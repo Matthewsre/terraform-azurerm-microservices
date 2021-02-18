@@ -13,7 +13,7 @@ module "microservice" {
         static_site         = {
             index_document  = "index.html"
             error_document  = "index.html"
-            #domain         = "my-domain.io"
+            domain          = "" # Set to empty if no custom domain is specified
         }
       },
       {
