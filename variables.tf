@@ -106,6 +106,11 @@ variable "microservices" {
       partition_key_path = string
       max_throughput     = number
     })))
+    static_site = optional(object({
+      index_document                = string
+      error_document                = string
+      domain                        = string
+    }))
   }))
 }
 
@@ -302,6 +307,31 @@ variable "storage_account_replication_type" {
   type        = string
   default     = "RAGRS"
 }
+
+### Static Site Variables
+variable "static_site_kind" {
+  description = "Kind of storage account to use for static site"
+  type        = string
+  default     = "StorageV2"
+}
+variable "static_site_tier" {
+  description = "Tier to use for static site"
+  type        = string
+  default     = "Standard"
+}
+
+variable "static_site_replication_type" {
+  description = "Defines the type of replication to use for the static site"
+  type        = string
+  default     = "RAGRS"
+}
+
+variable "static_site_tls_version" {
+  description = "Defines the type of replication to use for the static site"
+  type        = string
+  default     = "TLS1_2"
+}
+
 
 ### Key Vault Variables
 
