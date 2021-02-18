@@ -524,4 +524,11 @@ Function Apps will also have the following app settings values set:
 
 ```
 
+## Static Web App (azurerm_storage_account)
+If static_site is specified then a storage account will be created with static site hosting enabled and index/error pages set.  The site custom domain is optionally settable via the domain variable on the static_site.
+
+The variables static_site_kind, static_site_tier, static_site_replication_type, and static_site_tls_version can optionally be set to change from the defaults.
+
+Static Sites will also require https for traffic.
+
 ## Traffic Manager (azurerm_traffic_manager_profile, azurerm_traffic_manager_endpoint)

@@ -30,12 +30,17 @@ locals {
   has_http                           = var.http != null
   http_target                        = local.has_http ? var.http.target : local.has_appservice ? "appservice" : local.has_function ? "function" : null
   consumers                          = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
+  has_static_site                    = var.static_site !=null
 
-  # 24 characters is used for max key vault name
+  # 24 characters is used for max key vault and storage account names
   max_name_length                      = 24
+
   max_environment_differentiator_short = local.max_name_length - (length(var.name) + length(var.environment) + 2)
   environment_differentiator_short     = local.max_environment_differentiator_short > 0 ? length(var.environment_differentiator) <= local.max_environment_differentiator_short ? var.environment_differentiator : substr(var.environment_differentiator, 0, local.max_environment_differentiator_short) : ""
-
+  
+  max_environment_differentiator_short_withservice = local.max_name_length - (length(var.service_name) + length(var.name) + length(var.environment) + 2)
+  environment_differentiator_short_withservice     = local.max_environment_differentiator_short_withservice > 0 ? length(var.environment_differentiator) <= local.max_environment_differentiator_short_withservice ? var.environment_differentiator : substr(var.environment_differentiator, 0, local.max_environment_differentiator_short_withservice) : ""
+  
   key_vault_access_policies = [
     {
       tenant_id = var.azurerm_client_config.tenant_id
@@ -184,7 +189,7 @@ resource "azuread_application" "microservice" {
   display_name               = local.full_microservice_environment_name
   prevent_duplicate_names    = true
   oauth2_allow_implicit_flow = true
-  identifier_uris            = [lower("https://${local.full_microservice_environment_name}.trafficmanager.net/")]
+  identifier_uris            = [lower("api://${local.full_microservice_environment_name}")]
   owners                     = [var.azurerm_client_config.object_id]
   group_membership_claims    = "None"
   oauth2_permissions         = []
@@ -536,6 +541,26 @@ resource "azurerm_function_app_slot" "microservice" {
   ]
 }
 
+### Static Site
+  resource "azurerm_storage_account" "microservice" {
+  count = local.has_static_site ? 1 : 0
+
+  name                      = local.environment_differentiator_short_withservice != "" ? "${var.service_name}${var.name}${local.environment_differentiator_short_withservice}${var.environment}" : "${var.service_name}${var.name}${var.environment}"
+  resource_group_name       = var.resource_group_name
+  location                  = var.primary_region
+  account_kind              = var.static_site.storage_kind
+  account_tier              = var.static_site.storage_tier
+  account_replication_type  = var.static_site.storage_replication_type
+  enable_https_traffic_only = true
+  min_tls_version           = var.static_site.storage_tls_version
+  custom_domain {
+    name                    = var.static_site.domain != null ? var.static_site.domain : ""
+  }
+  static_website {
+    index_document          = var.static_site.index_document
+    error_404_document      = coalesce(var.static_site.error_document,var.static_site.index_document)
+  }
+}
 ### Traffic Manager
 
 # preparing data to be processed by a separate module to reduce conflicts between app service configurations and traffic manager
