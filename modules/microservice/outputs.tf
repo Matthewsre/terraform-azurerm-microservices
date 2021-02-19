@@ -11,7 +11,7 @@ output "database_id" {
 output "traffic_data" {
   description = "Data that can be used to setup traffic routing"
   value = {
-    microservice_environment_name = local.microservice_environment_name
+    microservice_environment_name = local.trafficmanager_name
     azure_endpoint_resources      = local.azure_endpoint_resources
   }
 }
