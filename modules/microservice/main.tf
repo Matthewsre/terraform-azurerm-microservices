@@ -205,7 +205,7 @@ resource "azuread_application" "microservice" {
   prevent_duplicate_names    = true
   oauth2_allow_implicit_flow = true
   identifier_uris            = [lower("api://${local.full_microservice_environment_name}")]
-  owners                     = [var.azurerm_client_config.object_id]
+  owners                     = var.application_owners
   group_membership_claims    = "None"
   oauth2_permissions         = []
 
