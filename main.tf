@@ -43,10 +43,21 @@ data "azuread_domains" "default" {
   only_default = true
 }
 
+# Only needed if the object_id isn't supplied when authenticating with a user assigned managed identity.
+data "azurerm_user_assigned_identity" "current" {
+  count = try(var.msi.use_user_assigned_msi, false) && try(var.msi.object_id, null) == null ? 1 : 0
+
+  name = var.msi.name
+  resource_group_name = var.msi.resource_group_name
+}
+
 locals {
   azuread_domain                           = data.azuread_domains.default.domains[0].domain_name
   primary_region                           = var.primary_region != "" ? var.primary_region : var.regions[0]
   secondary_region                         = var.secondary_region != "" ? var.secondary_region : length(var.regions) > 1 ? var.regions[1] : null
+  use_msi                                  = var.msi != null
+  msi_object_id                            = local.use_msi && var.msi.object_id != null ? var.msi.object_id : data.azurerm_user_assigned_identity.current[0].principal_id
+  client_object_id                         = local.use_msi ? local.msi_object_id : data.azurerm_client_config.current.object_id
   service_name                             = lower(var.service_name)
   environment_name                         = local.is_dev ? "${local.environment_differentiator}-${var.environment}" : var.environment
   service_environment_name                 = local.is_dev ? "${var.service_name}-${local.environment_differentiator}-${var.environment}" : "${var.service_name}-${var.environment}"
@@ -236,7 +247,7 @@ resource "azurerm_key_vault" "service" {
 
   access_policy {
     tenant_id = data.azurerm_client_config.current.tenant_id
-    object_id = data.azurerm_client_config.current.object_id
+    object_id = local.client_object_id
 
     certificate_permissions = var.key_vault_permissions.certificate_permissions
     key_permissions         = var.key_vault_permissions.key_permissions
@@ -403,6 +414,13 @@ resource "azurerm_app_service_plan" "service_consumption" {
 #### Microservice Resources ####
 ################################
 
+locals {
+  azurerm_client_config = {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = local.client_object_id
+  }
+}
+
 module "microservice" {
   source   = "./modules/microservice"
   for_each = { for microservice in var.microservices : microservice.name => microservice }
@@ -434,7 +452,7 @@ module "microservice" {
   key_vault_user_ids              = local.key_vault_user_ids
   key_vault_permissions           = var.key_vault_permissions
   key_vault_network_acls          = local.key_vault_network_acls
-  azurerm_client_config           = data.azurerm_client_config.current
+  azurerm_client_config           = local.azurerm_client_config
   application_insights            = azurerm_application_insights.service
   storage_accounts                = azurerm_storage_account.service
   sql_servers                     = local.has_sql_server ? azurerm_mssql_server.service : null

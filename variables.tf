@@ -4,6 +4,36 @@ variable "use_msi_to_authenticate" {
   default     = false
 }
 
+# 3 MSI configuration methods:
+   # System Assigned Managed Identity: supply Object ID
+   # User Assigned Managed Identity  : set use_user_assigned_msi, supply name/resource group; Sources objectID at runtime
+   # User Assigned Managed Identity  : set use_user_assigned_msi, supply objectId directly
+variable "msi" {
+  description = "MSI configuration information."
+  type        = object({
+    use_user_assigned_msi = bool
+
+    name                  = optional(string) 
+    resource_group_name   = optional(string)
+
+    object_id             = optional(string)
+  })
+
+  default = {
+      use_user_assigned_msi = false
+  }
+
+  validation {
+    condition     = var.msi != null && try(var.msi.use_user_assigned_msi, false) ? ((try(var.msi.name, null) != null && try(var.msi.resource_group_name, null) != null) || try(var.msi.object_id, null) != null) : true
+    error_message = "When using a user assigned managed identity either the identity name and resource group name, or the object ID need to be supplied."
+  }
+
+  validation {
+    condition     = var.msi != null && !try(var.msi.use_user_assigned_msi, false) ? try(var.msi.object_id, null) != null : true
+    error_message = "When using a system assigned managed identity the object ID needs to be supplied."
+  }
+}
+
 variable "azure_environment" {
   description = "Type of Azure Environment being deployed to"
   type        = string
