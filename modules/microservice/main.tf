@@ -32,6 +32,21 @@ locals {
   consumers                          = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
   has_static_site                    = var.static_site !=null
 
+  # For more public / gov differences see:
+  #   https://docs.microsoft.com/en-us/azure/azure-government/compare-azure-government-global-azure
+  functions_baseurl                  = var.azure_environment == "usgovernment" ? ".azurewebsites.us" :  ".azurewebsites.net"
+  appservices_baseurl                = var.azure_environment == "usgovernment" ? ".azurewebsites.us" :  ".azurewebsites.net"
+  trafficmanager_baseurl             = var.azure_environment == "usgovernment" ? ".usgovtrafficmanager.net" :  ".trafficmanager.net"
+  
+  trafficmanager_name                = local.full_microservice_environment_name
+  microservice_trafficmanager_url    = lower("https://${local.trafficmanager_name}${local.trafficmanager_baseurl}")
+  
+  appservice_callback_urls           = [for item in local.appservice_plans : lower("https://${var.name}-${item.location}-${var.environment_name}${local.appservices_baseurl}${var.callback_path}")]
+  function_callback_urls             = [for item in local.function_appservice_plans : lower("https://${var.name}-function-${item.location}-${var.environment_name}${local.functions_baseurl}${var.callback_path}")]
+  trafficmanager_callback_urls       = [lower("${local.microservice_trafficmanager_url}/"), lower("${local.microservice_trafficmanager_url}${var.callback_path}")]
+  
+  application_callback_urls          = concat(tolist(local.trafficmanager_callback_urls),tolist(local.appservice_callback_urls),tolist(local.function_callback_urls))
+
   # 24 characters is used for max key vault and storage account names
   max_name_length                      = 24
 
@@ -205,10 +220,7 @@ resource "azuread_application" "microservice" {
     }
   }
 
-  reply_urls = [
-    lower("https://${local.full_microservice_environment_name}.trafficmanager.net/"),
-    lower("https://${local.full_microservice_environment_name}.trafficmanager.net${var.callback_path}")
-  ]
+  reply_urls = local.application_callback_urls
 }
 
 # Combining the default InternalService role with additional roles
@@ -432,6 +444,23 @@ resource "azurerm_app_service" "microservice" {
     type         = local.appservice_identity_type
     identity_ids = local.user_assigned_identity_ids
   }
+
+  dynamic "auth_settings" {
+    for_each = var.require_auth ? [var.require_auth] : []
+
+    content {
+      enabled = true
+      active_directory  {
+          client_id = azuread_application.microservice.application_id
+          allowed_audiences = [ 
+            "https://${var.name}-${each.value.location}-${var.environment_name}${local.appservices_baseurl}",
+              local.microservice_trafficmanager_url 
+            ]
+      }
+      default_provider = "AzureActiveDirectory"
+      issuer = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
+    }
+  }
 }
 
 locals {
@@ -465,6 +494,24 @@ resource "azurerm_function_app" "microservice" {
     type         = local.appservice_identity_type
     identity_ids = local.user_assigned_identity_ids
   }
+  
+  dynamic "auth_settings" {
+    for_each = var.require_auth ? [var.require_auth] : []
+
+    content {
+      enabled = true
+      active_directory  {
+         client_id = azuread_application.microservice.application_id
+         allowed_audiences = [ 
+           "https://${var.name}-function-${each.value.location}-${var.environment_name}${local.functions_baseurl}",
+           local.microservice_trafficmanager_url  
+           ]
+      }
+      default_provider = "AzureActiveDirectory"
+      issuer = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
+    }
+  }
+
 }
 
 locals {

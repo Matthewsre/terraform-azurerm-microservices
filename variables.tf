@@ -88,11 +88,12 @@ variable "signed_out_callback_path" {
 variable "microservices" {
   description = "This will describe your microservices to determine which resources are needed"
   type = list(object({
-    name       = string
-    appservice = optional(string)
-    function   = optional(string)
-    sql        = optional(string)
-    roles      = optional(list(string))
+    name          = string
+    appservice    = optional(string)
+    function      = optional(string)
+    require_auth  = optional(bool)
+    sql           = optional(string)
+    roles         = optional(list(string))
     http = optional(object({
       target    = string
       consumers = list(string)
