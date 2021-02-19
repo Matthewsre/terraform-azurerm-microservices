@@ -41,8 +41,8 @@ locals {
   trafficmanager_name                = local.full_microservice_environment_name
   microservice_trafficmanager_url    = lower("https://${local.trafficmanager_name}${local.trafficmanager_baseurl}")
   
-  appservice_callback_urls           = [for item in local.appservice_plans : lower("https://${var.name}-${item.location}-${var.environment_name}${local.appservices_baseurl}${var.callback_path}")]
-  function_callback_urls             = [for item in local.function_appservice_plans : lower("https://${var.name}-function-${item.location}-${var.environment_name}${local.functions_baseurl}${var.callback_path}")]
+  appservice_callback_urls           = [for item in local.appservice_plans : lower("https://${var.service_name}-${var.name}-${item.location}-${var.environment_name}${local.appservices_baseurl}${var.callback_path}")]
+  function_callback_urls             = [for item in local.function_appservice_plans : lower("https://${var.service_name}-${var.name}-function-${item.location}-${var.environment_name}${local.functions_baseurl}${var.callback_path}")]
   trafficmanager_callback_urls       = [lower("${local.microservice_trafficmanager_url}/"), lower("${local.microservice_trafficmanager_url}${var.callback_path}")]
   
   application_callback_urls          = concat(tolist(local.trafficmanager_callback_urls),tolist(local.appservice_callback_urls),tolist(local.function_callback_urls))
@@ -424,7 +424,7 @@ resource "azurerm_app_service" "microservice" {
   for_each = local.appservice_plans
 
   resource_group_name = var.resource_group_name
-  name                = "${var.name}-${each.value.location}-${var.environment_name}"
+  name                = "${var.service_name}-${var.name}-${each.value.location}-${var.environment_name}"
   location            = each.value.location
   app_service_plan_id = each.value.id
   https_only          = true
@@ -453,7 +453,7 @@ resource "azurerm_app_service" "microservice" {
       active_directory  {
           client_id = azuread_application.microservice.application_id
           allowed_audiences = [ 
-            "https://${var.name}-${each.value.location}-${var.environment_name}${local.appservices_baseurl}",
+            "https://${var.service_name}-${var.name}-${each.value.location}-${var.environment_name}${local.appservices_baseurl}",
               local.microservice_trafficmanager_url 
             ]
       }
@@ -473,7 +473,7 @@ resource "azurerm_function_app" "microservice" {
   for_each = local.function_appservice_plans
 
   resource_group_name        = var.resource_group_name
-  name                       = "${var.name}-function-${each.value.location}-${var.environment_name}"
+  name                       = "${var.service_name}-${var.name}-function-${each.value.location}-${var.environment_name}"
   location                   = each.value.location
   app_service_plan_id        = each.value.id
   https_only                 = true
@@ -503,7 +503,7 @@ resource "azurerm_function_app" "microservice" {
       active_directory  {
          client_id = azuread_application.microservice.application_id
          allowed_audiences = [ 
-           "https://${var.name}-function-${each.value.location}-${var.environment_name}${local.functions_baseurl}",
+           "https://${var.service_name}-${var.name}-function-${each.value.location}-${var.environment_name}${local.functions_baseurl}",
            local.microservice_trafficmanager_url  
            ]
       }
