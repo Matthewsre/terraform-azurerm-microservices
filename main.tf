@@ -70,6 +70,8 @@ locals {
   include_ip_address = var.key_vault_include_ip_address == null ? local.is_dev : var.key_vault_include_ip_address == true
   lookup_ip_address  = local.include_ip_address && var.ip_address == ""
 
+  azure_easyauth_callback                 = "/.auth/login/aad/callback"
+
   # 24 characters is used for max storage name
   max_storage_name_length              = 24
   max_region_length                    = reverse(sort([for region in var.regions : length(region)]))[0] # bug is preventing max() from working used sort and reverse instead
@@ -409,12 +411,14 @@ module "microservice" {
   service_name                    = local.service_name
   azuread_domain                  = local.azuread_domain
   azuread_instance                = var.azuread_instance
+  azure_environment               = var.azure_environment
   environment                     = var.environment
   environment_differentiator      = local.environment_differentiator
   create_appsettings              = var.create_appsettings
   appsettings_path                = var.appsettings_path
   appservice                      = each.value.appservice
   function                        = each.value.function
+  require_auth                    = each.value.require_auth == null ? false : each.value.require_auth
   sql                             = each.value.sql
   roles                           = each.value.roles
   http                            = each.value.http
@@ -425,7 +429,7 @@ module "microservice" {
   primary_region                  = local.primary_region
   secondary_region                = local.secondary_region
   environment_name                = local.environment_name
-  callback_path                   = var.callback_path
+  callback_path                   = each.value.function != null ? local.azure_easyauth_callback : var.callback_path
   signed_out_callback_path        = var.signed_out_callback_path
   key_vault_user_ids              = local.key_vault_user_ids
   key_vault_permissions           = var.key_vault_permissions

@@ -31,6 +31,8 @@ locals {
   http_target                        = local.has_http ? var.http.target : local.has_appservice ? "appservice" : local.has_function ? "function" : null
   consumers                          = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
   has_static_site                    = var.static_site !=null
+  functions_baseurl                  = var.azure_environment == "usgovernment" ? ".azurewebsites.us" :  ".azurewebsites.net"
+  microservice_trafficmanager_url    = lower("https://${local.full_microservice_environment_name}.trafficmanager.net/")
 
   # 24 characters is used for max key vault and storage account names
   max_name_length                      = 24
@@ -464,6 +466,16 @@ resource "azurerm_function_app" "microservice" {
   identity {
     type         = local.appservice_identity_type
     identity_ids = local.user_assigned_identity_ids
+  }
+
+  auth_settings {
+    enabled = var.require_auth
+    active_directory  {
+         client_id = azuread_application.microservice.application_id
+         allowed_audiences = [ "https://${var.name}-function-${each.value.location}-${var.environment_name}{local.functions_baseurl}" ]
+     }
+     default_provider = "AzureActiveDirectory"
+     issuer = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
   }
 }
 
