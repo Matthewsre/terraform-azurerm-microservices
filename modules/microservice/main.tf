@@ -126,7 +126,7 @@ locals {
 resource "azurerm_key_vault" "microservice" {
   count = local.has_key_vault ? 1 : 0
 
-  name                        = local.environment_differentiator_short != "" ? "${var.service_name}${var.name}-${local.environment_differentiator_short}-${var.environment}" : "${var.service_name}${var.name}-${var.environment}"
+  name                        = coalesce(var.keyvault,local.environment_differentiator_short != "" ? "${var.service_name}${var.name}-${local.environment_differentiator_short}-${var.environment}" : "${var.service_name}${var.name}-${var.environment}")
   location                    = var.primary_region
   resource_group_name         = var.resource_group_name
   enabled_for_disk_encryption = true

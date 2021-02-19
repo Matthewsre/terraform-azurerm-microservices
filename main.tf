@@ -225,7 +225,7 @@ resource "azurerm_cosmosdb_sql_database" "service" {
 }
 
 resource "azurerm_key_vault" "service" {
-  name                        = local.environment_differentiator_short2 != "" ? "${local.service_name}-${local.environment_differentiator_short2}-${var.environment}" : "${local.service_name}-${var.environment}"
+  name                        = coalesce(var.keyvault,local.environment_differentiator_short2 != "" ? "${local.service_name}-${local.environment_differentiator_short2}-${var.environment}" : "${local.service_name}-${var.environment}")
   location                    = local.primary_region
   resource_group_name         = local.resource_group_name
   enabled_for_disk_encryption = true
@@ -459,6 +459,7 @@ module "microservice" {
                                         storage_replication_type    = var.static_site_replication_type
                                         storage_tls_version         = var.static_site_tls_version
                                       }: null
+  keyvault                        = each.value.keyvault
 
   depends_on = [
     azurerm_storage_account.service,

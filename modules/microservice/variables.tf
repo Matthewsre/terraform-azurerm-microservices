@@ -113,6 +113,12 @@ variable "function" {
   }
 }
 
+variable "keyvault" {
+  description = "Specify name of the KeyVault if the default name is not desired"
+  type        = string
+  default     = ""
+}
+
 variable "require_auth" {
   description = "Specify if the resource requires users to be authenticated or not"
   type        = bool
