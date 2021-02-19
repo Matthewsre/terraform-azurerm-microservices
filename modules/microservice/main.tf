@@ -205,7 +205,7 @@ resource "azuread_application" "microservice" {
   prevent_duplicate_names    = true
   oauth2_allow_implicit_flow = true
   identifier_uris            = [lower("api://${local.full_microservice_environment_name}")]
-  owners                     = var.application_owners
+  owners                     = [var.azurerm_client_config.object_id]
   group_membership_claims    = "None"
   oauth2_permissions         = []
 
@@ -445,20 +445,17 @@ resource "azurerm_app_service" "microservice" {
     identity_ids = local.user_assigned_identity_ids
   }
 
-  dynamic "auth_settings" {
-    count = var.require_auth ? 1 : 0
-    content {
-      enabled = var.require_auth
-      active_directory  {
-          client_id = azuread_application.microservice.application_id
-          allowed_audiences = [ 
-            "https://${var.name}-${each.value.location}-${var.environment_name}${local.appservices_baseurl}",
-              local.microservice_trafficmanager_url 
-            ]
-      }
-      default_provider = "AzureActiveDirectory"
-      issuer = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
-    }
+  auth_settings {
+    enabled = var.require_auth
+    active_directory  {
+         client_id = azuread_application.microservice.application_id
+         allowed_audiences = [ 
+           "https://${var.name}-${each.value.location}-${var.environment_name}${local.appservices_baseurl}",
+            local.microservice_trafficmanager_url 
+           ]
+     }
+     default_provider = "AzureActiveDirectory"
+     issuer = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
   }
 }
 
