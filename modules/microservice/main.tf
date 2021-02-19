@@ -37,8 +37,15 @@ locals {
   functions_baseurl                  = var.azure_environment == "usgovernment" ? ".azurewebsites.us" :  ".azurewebsites.net"
   appservices_baseurl                = var.azure_environment == "usgovernment" ? ".azurewebsites.us" :  ".azurewebsites.net"
   trafficmanager_baseurl             = var.azure_environment == "usgovernment" ? ".usgovtrafficmanager.net" :  ".trafficmanager.net"
+  
   trafficmanager_name                = local.full_microservice_environment_name
   microservice_trafficmanager_url    = lower("https://${local.trafficmanager_name}${local.trafficmanager_baseurl}")
+  
+  appservice_callback_urls           = [for item in local.appservice_plans : lower("https://${var.name}-${item.location}-${var.environment_name}${local.appservices_baseurl}${var.callback_path}")]
+  function_callback_urls             = [for item in local.function_appservice_plans : lower("https://${var.name}-function-${item.location}-${var.environment_name}${local.functions_baseurl}${var.callback_path}")]
+  trafficmanager_callback_urls       = [lower("${local.microservice_trafficmanager_url}/"), lower("${local.microservice_trafficmanager_url}${var.callback_path}")]
+  
+  application_callback_urls          = concat(tolist(local.trafficmanager_callback_urls),tolist(local.appservice_callback_urls),tolist(local.function_callback_urls))
 
   # 24 characters is used for max key vault and storage account names
   max_name_length                      = 24
@@ -213,10 +220,7 @@ resource "azuread_application" "microservice" {
     }
   }
 
-  reply_urls = [
-    lower("${local.microservice_trafficmanager_url}/"),
-    lower("${local.microservice_trafficmanager_url}${var.callback_path}")
-  ]
+  reply_urls = local.application_callback_urls
 }
 
 # Combining the default InternalService role with additional roles
