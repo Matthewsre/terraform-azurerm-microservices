@@ -40,6 +40,12 @@ variable "retention_in_days" {
   type        = number
 }
 
+variable "azure_environment" {
+  description = "Type of Azure Environment being deployed to"
+  type        = string
+  default     = "public"
+}
+
 variable "environment" {
   description = "Terrform environment we're acting in"
   type        = string
@@ -106,6 +112,13 @@ variable "function" {
     error_message = "Value must be '', 'plan', or 'consumption'."
   }
 }
+
+variable "require_auth" {
+  description = "Specify if the resource requires users to be authenticated or not"
+  type        = bool
+  default     = false
+}
+
 
 variable "sql" {
   description = "Specify SQL type if used ('server' or 'elastic')"
