@@ -48,6 +48,15 @@ data "azuread_users" "owners" {
   ignore_missing = true
 }
 
+data "azuread_groups" "owner_group" {
+  object_ids = var.application_owner_group_object_ids
+}
+
+data "azuread_group" "owner_groups" {
+  for_each = zipmap(data.azuread_groups.owner_group.object_ids,data.azuread_groups.owner_group.object_ids)
+  object_id = each.value
+}
+
 locals {
   azuread_domain                           = data.azuread_domains.default.domains[0].domain_name
   primary_region                           = var.primary_region != "" ? var.primary_region : var.regions[0]
@@ -77,7 +86,8 @@ locals {
 
   azure_easyauth_callback                 = "/.auth/login/aad/callback"
 
-  application_owners                         = concat(data.azuread_users.owners.object_ids,[data.azurerm_client_config.current.object_id])
+  owner_group_members                     = data.azuread_group.owner_groups!= null ? flatten([for item in data.azuread_group.owner_groups: item.members]):[]
+  application_owners                      = distinct(concat(local.owner_group_members, data.azuread_users.owners.object_ids,[data.azurerm_client_config.current.object_id]))
 
   # 24 characters is used for max storage name
   max_storage_name_length              = 24
