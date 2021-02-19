@@ -445,17 +445,21 @@ resource "azurerm_app_service" "microservice" {
     identity_ids = local.user_assigned_identity_ids
   }
 
-  auth_settings {
-    enabled = var.require_auth
-    active_directory  {
-         client_id = azuread_application.microservice.application_id
-         allowed_audiences = [ 
-           "https://${var.name}-${each.value.location}-${var.environment_name}${local.appservices_baseurl}",
-            local.microservice_trafficmanager_url 
-           ]
-     }
-     default_provider = "AzureActiveDirectory"
-     issuer = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
+  dynamic "auth_settings" {
+    for_each = var.require_auth ? [var.require_auth] : []
+
+    content {
+      enabled = true
+      active_directory  {
+          client_id = azuread_application.microservice.application_id
+          allowed_audiences = [ 
+            "https://${var.name}-${each.value.location}-${var.environment_name}${local.appservices_baseurl}",
+              local.microservice_trafficmanager_url 
+            ]
+      }
+      default_provider = "AzureActiveDirectory"
+      issuer = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
+    }
   }
 }
 
@@ -490,19 +494,24 @@ resource "azurerm_function_app" "microservice" {
     type         = local.appservice_identity_type
     identity_ids = local.user_assigned_identity_ids
   }
+  
+  dynamic "auth_settings" {
+    for_each = var.require_auth ? [var.require_auth] : []
 
-  auth_settings {
-    enabled = var.require_auth
-    active_directory  {
+    content {
+      enabled = true
+      active_directory  {
          client_id = azuread_application.microservice.application_id
          allowed_audiences = [ 
            "https://${var.name}-function-${each.value.location}-${var.environment_name}${local.functions_baseurl}",
            local.microservice_trafficmanager_url  
            ]
-     }
-     default_provider = "AzureActiveDirectory"
-     issuer = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
+      }
+      default_provider = "AzureActiveDirectory"
+      issuer = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
+    }
   }
+
 }
 
 locals {
