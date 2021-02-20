@@ -11,7 +11,7 @@ terraform {
 }
 
 provider "azurerm" {
-  use_msi                    = var.use_msi_to_authenticate
+  use_msi                    = var.use_msi_to_authenticate || var.msi != null
   environment                = var.azure_environment
   skip_provider_registration = true
   features {
