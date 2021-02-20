@@ -56,7 +56,7 @@ locals {
   primary_region                           = var.primary_region != "" ? var.primary_region : var.regions[0]
   secondary_region                         = var.secondary_region != "" ? var.secondary_region : length(var.regions) > 1 ? var.regions[1] : null
   use_msi                                  = var.msi != null
-  msi_object_id                            = local.use_msi && var.msi.object_id != null ? var.msi.object_id : data.azurerm_user_assigned_identity.current[0].principal_id
+  msi_object_id                            = local.use_msi ? try(var.msi.object_id, null) != null  ? var.msi.object_id : data.azurerm_user_assigned_identity.current[0].principal_id : ""
   client_object_id                         = local.use_msi ? local.msi_object_id : data.azurerm_client_config.current.object_id
   service_name                             = lower(var.service_name)
   environment_name                         = local.is_dev ? "${local.environment_differentiator}-${var.environment}" : var.environment

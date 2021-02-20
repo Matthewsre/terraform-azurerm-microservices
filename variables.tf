@@ -19,9 +19,7 @@ variable "msi" {
     object_id             = optional(string)
   })
 
-  default = {
-      use_user_assigned_msi = false
-  }
+  default = null
 
   validation {
     condition     = var.msi != null && try(var.msi.use_user_assigned_msi, false) ? ((try(var.msi.name, null) != null && try(var.msi.resource_group_name, null) != null) || try(var.msi.object_id, null) != null) : true
