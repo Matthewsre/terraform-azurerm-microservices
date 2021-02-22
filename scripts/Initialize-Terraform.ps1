@@ -13,7 +13,8 @@ param(
     [string] $tenantId,
     [switch] $useMsi,
     [string] $clientId,
-    [string] $objectId)
+    [string] $objectId,
+    [switch] $planOnly)
 
 $resourceGroupName = if ([String]::IsNullOrWhiteSpace($stateResourceGroupName)) { "${serviceName}-tf-${environment}".ToLower() } else { $stateResourceGroupName }
 $storageAccountName = if ([String]::IsNullOrWhiteSpace($stateStorageAccountName)) { "${serviceName}tf${environment}".ToLower() } else { $stateStorageAccountName }
@@ -77,7 +78,7 @@ if (-not $storageAccountPermissionExists) {
 }
 
 $containerExists = $storageAccountExists -eq $true -and $(az storage container exists -n $containerName --account-name $storageAccountName --query "exists" --auth-mode login) -eq $true
-Write-Host $containerExists
+Write-Host "Container Exists: ${containerExists}"
 
 # Create container if it does not exist
 if (-not $containerExists) {
@@ -112,18 +113,28 @@ terraform init -input=false `
     -backend-config="container_name=${containerName}" `
     -backend-config="key=${fileName}"
 
-Write-Host "Creating Terraform Plan"
+if ($planOnly) {
+    Write-Host "Creating Terraform Plan"
+    terraform plan -input=false `
+        -var="service_name=${serviceName}" `
+        -var-file=".\config\${serviceName}.tfvars" `
+        -var-file=".\config\${environment}.tfvars" `
+        -out "${fileName}.tfplan"
+}
+else {
+    Write-Host "Applying Terraform"
+    terraform apply -input=false `
+        -auto-approve `
+        -var="service_name=${serviceName}" `
+        -var-file=".\config\${serviceName}.tfvars" `
+        -var-file=".\config\${environment}.tfvars" `
+        -out "${fileName}.tfplan"
+}
 
-terraform plan `
-    -var="service_name=${serviceName}" `
-    -var-file=".\config\${serviceName}.tfvars" `
-    -var-file=".\config\${environment}.tfvars" `
-    -out "${fileName}.tfplan"
-
-# First run this to download modules without initializing the back end
+# First - run this to download modules without initializing the back end
 # terraform init -input=false -get=true -backend=false
 
 # Second - run this to initialize with back end created.
 # .\scripts\Initialize-Terraform.ps1 -serviceName "foundation" -environment "dev"
-# .\.terraform\modules\scripts\Initialize-Terraform.ps1 -serviceName "foundation" -environment "dev"
+# .\.terraform\modules\microservice\scripts\Initialize-Terraform.ps1 -serviceName "foundation" -environment "dev"
 # ..\..\scripts\Initialize-Terraform.ps1 -serviceName "foundation" -environment "dev"
