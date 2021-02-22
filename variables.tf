@@ -83,6 +83,12 @@ variable "service_name" {
   type        = string
 }
 
+variable "keyvault" {
+  description = "Specify name of the KeyVault if the default name is not desired"
+  type        = string
+  default     = ""
+}
+
 variable "callback_path" {
   description = "Callback path for authorization"
   type        = string
@@ -103,6 +109,7 @@ variable "microservices" {
     name          = string
     appservice    = optional(string)
     function      = optional(string)
+    keyvault      = optional(string)
     require_auth  = optional(bool)
     sql           = optional(string)
     roles         = optional(list(string))

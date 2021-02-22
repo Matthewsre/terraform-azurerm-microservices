@@ -50,11 +50,11 @@ locals {
   # 24 characters is used for max key vault and storage account names
   max_name_length                      = 24
 
-  max_environment_differentiator_short = local.max_name_length - (length(var.name) + length(var.environment) + 2)
+  max_environment_differentiator_short = local.max_name_length - (length(var.service_name) + length(var.name) + length(var.environment) + 2)
   environment_differentiator_short     = local.max_environment_differentiator_short > 0 ? length(var.environment_differentiator) <= local.max_environment_differentiator_short ? var.environment_differentiator : substr(var.environment_differentiator, 0, local.max_environment_differentiator_short) : ""
   
-  max_environment_differentiator_short_withservice = local.max_name_length - (length(var.service_name) + length(var.name) + length(var.environment) + 2)
-  environment_differentiator_short_withservice     = local.max_environment_differentiator_short_withservice > 0 ? length(var.environment_differentiator) <= local.max_environment_differentiator_short_withservice ? var.environment_differentiator : substr(var.environment_differentiator, 0, local.max_environment_differentiator_short_withservice) : ""
+  max_environment_differentiator_short_noseparator = local.max_name_length - (length(var.service_name) + length(var.name) + length(var.environment) + 2)
+  environment_differentiator_short_noseparator     = local.max_environment_differentiator_short_noseparator > 0 ? length(var.environment_differentiator) <= local.max_environment_differentiator_short_noseparator ? var.environment_differentiator : substr(var.environment_differentiator, 0, local.max_environment_differentiator_short_noseparator) : ""
   
   key_vault_access_policies = [
     {
@@ -126,7 +126,7 @@ locals {
 resource "azurerm_key_vault" "microservice" {
   count = local.has_key_vault ? 1 : 0
 
-  name                        = local.environment_differentiator_short != "" ? "${var.name}-${local.environment_differentiator_short}-${var.environment}" : "${var.name}-${var.environment}"
+  name                        = coalesce(var.keyvault,local.environment_differentiator_short != "" ? "${var.service_name}${var.name}-${local.environment_differentiator_short}-${var.environment}" : "${var.service_name}${var.name}-${var.environment}")
   location                    = var.primary_region
   resource_group_name         = var.resource_group_name
   enabled_for_disk_encryption = true
@@ -592,7 +592,7 @@ resource "azurerm_function_app_slot" "microservice" {
   resource "azurerm_storage_account" "microservice" {
   count = local.has_static_site ? 1 : 0
 
-  name                      = local.environment_differentiator_short_withservice != "" ? "${var.service_name}${var.name}${local.environment_differentiator_short_withservice}${var.environment}" : "${var.service_name}${var.name}${var.environment}"
+  name                      = local.environment_differentiator_short_noseparator != "" ? "${var.service_name}${var.name}${local.environment_differentiator_short_noseparator}${var.environment}" : "${var.service_name}${var.name}${var.environment}"
   resource_group_name       = var.resource_group_name
   location                  = var.primary_region
   account_kind              = var.static_site.storage_kind
