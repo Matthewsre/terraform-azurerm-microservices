@@ -42,6 +42,18 @@ variable "appsettings_path" {
   default     = "C:\\dev\\"
 }
 
+variable "application_owner_user_principal_names" {
+  description = "Provides user account UPNs that will be owners of the created applications"
+  type        = list(string)
+  default     = []
+}
+
+variable "application_owner_group_object_ids" {
+  description = "Provides object ids of the groups with the user accounts that will be owners of the created applications"
+  type        = list(string)
+  default     = []
+}
+
 variable "ip_address" {
   description = "IP Address that will be used for dev environments to add to firewall rules"
   type        = string

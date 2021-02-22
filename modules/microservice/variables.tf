@@ -46,6 +46,12 @@ variable "azure_environment" {
   default     = "public"
 }
 
+variable "application_owners" {
+  description = "ObjectIds who will be an owner of the created applications."
+  type        = list(string)
+  default     = []
+}
+
 variable "environment" {
   description = "Terrform environment we're acting in"
   type        = string
