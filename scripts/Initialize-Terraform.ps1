@@ -127,8 +127,7 @@ else {
         -auto-approve `
         -var="service_name=${serviceName}" `
         -var-file=".\config\${serviceName}.tfvars" `
-        -var-file=".\config\${environment}.tfvars" `
-        -out "${fileName}.tfplan"
+        -var-file=".\config\${environment}.tfvars"
 }
 
 # First - run this to download modules without initializing the back end
