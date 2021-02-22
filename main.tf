@@ -53,7 +53,7 @@ data "azuread_group" "owner_groups" {
   object_id = each.value
 }
 
-data "azuread_users" "owners_from_group" {
+data "azuread_users" "owner_groups_users" {
   object_ids = flatten([for item in data.azuread_group.owner_groups: item.members])
   ignore_missing = true
 }
@@ -87,7 +87,7 @@ locals {
 
   azure_easyauth_callback                 = "/.auth/login/aad/callback"
 
-  owner_group_members                     = data.azuread_users.owners_from_group!= null ? tolist(data.azuread_users.owners_from_group.object_ids):[]
+  owner_group_members                     = data.azuread_users.owner_groups_users!= null ? tolist(data.azuread_users.owner_groups_users.object_ids):[]
   application_owners                      = distinct(concat(local.owner_group_members, data.azuread_users.owners.object_ids,[data.azurerm_client_config.current.object_id]))
 
   # 24 characters is used for max storage name
