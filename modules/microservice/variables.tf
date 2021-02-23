@@ -326,11 +326,15 @@ variable "static_site" {
   type = object({
       index_document                = string
       error_document                = string
-      domain                        = string
       storage_kind                  = string
       storage_tier                  = string
       storage_replication_type      = string
       storage_tls_version           = string
     })
   default = null
+}
+
+variable "custom_domain" {
+  description = "Custom domain where the service is exposed at"
+  type        = string
 }

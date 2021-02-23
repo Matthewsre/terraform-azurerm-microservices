@@ -31,6 +31,7 @@ locals {
   http_target                        = local.has_http ? var.http.target : local.has_appservice ? "appservice" : local.has_function ? "function" : null
   consumers                          = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
   has_static_site                    = var.static_site !=null
+  has_custom_domain                  = var.custom_domain != null && var.custom_domain != ""
 
   # For more public / gov differences see:
   #   https://docs.microsoft.com/en-us/azure/azure-government/compare-azure-government-global-azure
@@ -44,8 +45,9 @@ locals {
   appservice_callback_urls           = [for item in local.appservice_plans : lower("https://${var.name}-${item.location}-${var.environment_name}${local.appservices_baseurl}${var.callback_path}")]
   function_callback_urls             = [for item in local.function_appservice_plans : lower("https://${var.name}-function-${item.location}-${var.environment_name}${local.functions_baseurl}${var.callback_path}")]
   trafficmanager_callback_urls       = [lower("${local.microservice_trafficmanager_url}/"), lower("${local.microservice_trafficmanager_url}${var.callback_path}")]
+  custom_domain_callback_urls        = local.has_custom_domain ? ["https://${var.custom_domain}${var.callback_path}"] : []
   
-  application_callback_urls          = concat(tolist(local.trafficmanager_callback_urls),tolist(local.appservice_callback_urls),tolist(local.function_callback_urls))
+  application_callback_urls          = concat(tolist(local.trafficmanager_callback_urls),tolist(local.appservice_callback_urls),tolist(local.function_callback_urls),local.custom_domain_callback_urls)
 
   # 24 characters is used for max key vault and storage account names
   max_name_length                      = 24
@@ -601,7 +603,7 @@ resource "azurerm_function_app_slot" "microservice" {
   enable_https_traffic_only = true
   min_tls_version           = var.static_site.storage_tls_version
   custom_domain {
-    name                    = var.static_site.domain != null ? var.static_site.domain : ""
+    name                    = var.has_custom_domain ? var.custom_domain : ""
   }
   static_website {
     index_document          = var.static_site.index_document

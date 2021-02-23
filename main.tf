@@ -469,10 +469,10 @@ module "microservice" {
   appservice_plans                = azurerm_app_service_plan.service
   appservice_deployment_slots     = var.appservice_deployment_slots
   consumption_appservice_plans    = azurerm_app_service_plan.service_consumption
+  custom_domain                   = each.value.custom_domain
   static_site                     = each.value.static_site != null ? {
                                         index_document              = each.value.static_site.index_document
                                         error_document              = each.value.static_site.error_document
-                                        domain                      = each.value.static_site.domain
                                         storage_kind                = var.static_site_kind
                                         storage_tier                = var.static_site_tier
                                         storage_replication_type    = var.static_site_replication_type
