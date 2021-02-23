@@ -4,6 +4,12 @@ variable "use_msi_to_authenticate" {
   default     = false
 }
 
+variable "executing_object_id" {
+  description = "Object Id of user, service principal, MSI, etc. that is being used to execute this module. Needed for setting permissions such as KeyVault."
+  type        = string
+  default     = ""
+}
+
 variable "resource_group_name" {
   description = "Name of the resource group"
   type        = string
@@ -50,6 +56,18 @@ variable "application_owners" {
   description = "ObjectIds who will be an owner of the created applications."
   type        = list(string)
   default     = []
+}
+
+variable "application_permissions" {
+  description = "Additional permissions to be added to the application"
+  type = list(object({
+    resource_app_id = string
+    resource_access = list(object({
+      id   = string
+      type = string
+      })
+  ) }))
+  default = []
 }
 
 variable "environment" {
@@ -321,16 +339,16 @@ variable "key_vault_network_acls" {
   default = null
 }
 
-variable "static_site" { 
+variable "static_site" {
   description = "Defines the static site settings"
   type = object({
-      index_document                = string
-      error_document                = string
-      domain                        = string
-      storage_kind                  = string
-      storage_tier                  = string
-      storage_replication_type      = string
-      storage_tls_version           = string
-    })
+    index_document           = string
+    error_document           = string
+    domain                   = string
+    storage_kind             = string
+    storage_tier             = string
+    storage_replication_type = string
+    storage_tls_version      = string
+  })
   default = null
 }

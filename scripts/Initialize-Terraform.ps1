@@ -61,6 +61,8 @@ if (-not $storageAccountExists) {
 
 # Ensure current user has role to create/manage Storage Container
 $objectId = if ([String]::IsNullOrWhiteSpace($objectId)) { az ad signed-in-user show --query objectId -o tsv } else { $objectId }
+$objectId = if ([String]::IsNullOrWhiteSpace($objectId) -and -not [String]::IsNullOrWhiteSpace($clientId)) { az ad sp list --filter "appId eq '${clientId}'" --query "[].{objectId:objectId}" -o tsv } else { $objectId }
+
 $subscriptionId = if ([String]::IsNullOrWhiteSpace($subscriptionId)) { az account show --query id --output tsv } else { $subscriptionId }
 $tenantId = if ([String]::IsNullOrWhiteSpace($tenantId)) { az account show --query tenantId --output tsv } else { $tenantId }
 $scope = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.Storage/storageAccounts/$storageAccountName"
@@ -117,6 +119,7 @@ if ($planOnly) {
     Write-Host "Creating Terraform Plan"
     terraform plan -input=false `
         -var="service_name=${serviceName}" `
+        -var="executing_object_id=${objectId}" `
         -var-file=".\config\${serviceName}.tfvars" `
         -var-file=".\config\${environment}.tfvars" `
         -out "${fileName}.tfplan"
@@ -126,6 +129,7 @@ else {
     terraform apply -input=false `
         -auto-approve `
         -var="service_name=${serviceName}" `
+        -var="executing_object_id=${objectId}" `
         -var-file=".\config\${serviceName}.tfvars" `
         -var-file=".\config\${environment}.tfvars"
 }

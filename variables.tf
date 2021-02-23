@@ -4,6 +4,12 @@ variable "use_msi_to_authenticate" {
   default     = false
 }
 
+variable "executing_object_id" {
+  description = "Object Id of user, service principal, MSI, etc. that is being used to execute this module. Needed for setting permissions such as KeyVault."
+  type        = string
+  default     = ""
+}
+
 variable "azure_environment" {
   description = "Type of Azure Environment being deployed to"
   type        = string
@@ -100,12 +106,19 @@ variable "signed_out_callback_path" {
 variable "microservices" {
   description = "This will describe your microservices to determine which resources are needed"
   type = list(object({
-    name          = string
-    appservice    = optional(string)
-    function      = optional(string)
-    require_auth  = optional(bool)
-    sql           = optional(string)
-    roles         = optional(list(string))
+    name         = string
+    appservice   = optional(string)
+    function     = optional(string)
+    require_auth = optional(bool)
+    sql          = optional(string)
+    roles        = optional(list(string))
+    application_permissions = optional(list(object({
+      resource_app_id = string
+      resource_access = list(object({
+        id   = string
+        type = string
+        })
+    ) })))
     http = optional(object({
       target    = string
       consumers = list(string)
@@ -120,9 +133,9 @@ variable "microservices" {
       max_throughput     = number
     })))
     static_site = optional(object({
-      index_document                = string
-      error_document                = string
-      domain                        = string
+      index_document = string
+      error_document = string
+      domain         = string
     }))
   }))
 }
