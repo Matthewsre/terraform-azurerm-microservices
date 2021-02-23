@@ -45,16 +45,16 @@ data "azuread_domains" "default" {
 
 data "azuread_users" "owners" {
   user_principal_names = var.application_owner_user_principal_names
-  ignore_missing = true
+  ignore_missing       = true
 }
 
 data "azuread_group" "owner_groups" {
-  for_each = zipmap(var.application_owner_group_object_ids,var.application_owner_group_object_ids)
+  for_each  = zipmap(var.application_owner_group_object_ids, var.application_owner_group_object_ids)
   object_id = each.value
 }
 
 data "azuread_users" "owner_groups_users" {
-  object_ids = flatten([for item in data.azuread_group.owner_groups: item.members])
+  object_ids     = flatten([for item in data.azuread_group.owner_groups : item.members])
   ignore_missing = true
 }
 
@@ -63,6 +63,7 @@ locals {
   primary_region                           = var.primary_region != "" ? var.primary_region : var.regions[0]
   secondary_region                         = var.secondary_region != "" ? var.secondary_region : length(var.regions) > 1 ? var.regions[1] : null
   service_name                             = lower(var.service_name)
+  executing_object_id                      = data.azurerm_client_config.current.object_id != null && data.azurerm_client_config.current.object_id != "" ? data.azurerm_client_config.current.object_id : var.executing_object_id
   environment_name                         = local.is_dev ? "${local.environment_differentiator}-${var.environment}" : var.environment
   service_environment_name                 = local.is_dev ? "${var.service_name}-${local.environment_differentiator}-${var.environment}" : "${var.service_name}-${var.environment}"
   environment_differentiator               = var.environment_differentiator != "" ? var.environment_differentiator : local.is_dev && length(data.azuread_user.current_user) > 0 ? replace(split(".", split("_", split("#EXT#", data.azuread_user.current_user[0].mail_nickname)[0])[0])[0], "-", "") : ""
@@ -85,10 +86,10 @@ locals {
   include_ip_address = var.key_vault_include_ip_address == null ? local.is_dev : var.key_vault_include_ip_address == true
   lookup_ip_address  = local.include_ip_address && var.ip_address == ""
 
-  azure_easyauth_callback                 = "/.auth/login/aad/callback"
+  azure_easyauth_callback = "/.auth/login/aad/callback"
 
-  owner_group_members                     = data.azuread_users.owner_groups_users!= null ? tolist(data.azuread_users.owner_groups_users.object_ids):[]
-  application_owners                      = distinct(concat(local.owner_group_members, data.azuread_users.owners.object_ids,[data.azurerm_client_config.current.object_id]))
+  owner_group_members = data.azuread_users.owner_groups_users != null ? tolist(data.azuread_users.owner_groups_users.object_ids) : []
+  application_owners  = distinct(concat(local.owner_group_members, data.azuread_users.owners.object_ids, [local.executing_object_id]))
 
   # 24 characters is used for max storage name
   max_storage_name_length              = 24
@@ -254,7 +255,7 @@ resource "azurerm_key_vault" "service" {
 
   access_policy {
     tenant_id = data.azurerm_client_config.current.tenant_id
-    object_id = data.azurerm_client_config.current.object_id
+    object_id = local.executing_object_id
 
     certificate_permissions = var.key_vault_permissions.certificate_permissions
     key_permissions         = var.key_vault_permissions.key_permissions
@@ -455,6 +456,7 @@ module "microservice" {
   key_vault_permissions           = var.key_vault_permissions
   key_vault_network_acls          = local.key_vault_network_acls
   azurerm_client_config           = data.azurerm_client_config.current
+  executing_object_id             = local.executing_object_id
   application_insights            = azurerm_application_insights.service
   storage_accounts                = azurerm_storage_account.service
   sql_servers                     = local.has_sql_server ? azurerm_mssql_server.service : null
@@ -470,15 +472,15 @@ module "microservice" {
   appservice_plans                = azurerm_app_service_plan.service
   appservice_deployment_slots     = var.appservice_deployment_slots
   consumption_appservice_plans    = azurerm_app_service_plan.service_consumption
-  static_site                     = each.value.static_site != null ? {
-                                        index_document              = each.value.static_site.index_document
-                                        error_document              = each.value.static_site.error_document
-                                        domain                      = each.value.static_site.domain
-                                        storage_kind                = var.static_site_kind
-                                        storage_tier                = var.static_site_tier
-                                        storage_replication_type    = var.static_site_replication_type
-                                        storage_tls_version         = var.static_site_tls_version
-                                      }: null
+  static_site = each.value.static_site != null ? {
+    index_document           = each.value.static_site.index_document
+    error_document           = each.value.static_site.error_document
+    domain                   = each.value.static_site.domain
+    storage_kind             = var.static_site_kind
+    storage_tier             = var.static_site_tier
+    storage_replication_type = var.static_site_replication_type
+    storage_tls_version      = var.static_site_tls_version
+  } : null
 
   depends_on = [
     azurerm_storage_account.service,

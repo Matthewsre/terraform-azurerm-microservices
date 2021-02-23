@@ -30,47 +30,47 @@ locals {
   has_http                           = var.http != null
   http_target                        = local.has_http ? var.http.target : local.has_appservice ? "appservice" : local.has_function ? "function" : null
   consumers                          = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
-  has_static_site                    = var.static_site !=null
+  has_static_site                    = var.static_site != null
   has_application_permissions        = var.application_permissions != null
   application_permissions            = local.has_application_permissions ? var.application_permissions : []
 
-  graph_resource_app_id              = "00000003-0000-0000-c000-000000000000"
-  graph_application_permissions      = local.has_application_permissions ? [for item in local.application_permissions: item if item.resource_app_id == local.graph_resource_app_id] : []
-  other_application_permissions      = local.has_application_permissions ? [for item in local.application_permissions: item if item.resource_app_id != local.graph_resource_app_id]:[]
-  graph_user_read_access             =  {
-                                        id="e1fe6dd8-ba31-4d61-89e7-88639da4683d" 
-                                        type="Scope"
-                                        }
-  graph_resource_access              = distinct(concat(flatten(local.graph_application_permissions[*].resource_access),[local.graph_user_read_access]))
+  graph_resource_app_id         = "00000003-0000-0000-c000-000000000000"
+  graph_application_permissions = local.has_application_permissions ? [for item in local.application_permissions : item if item.resource_app_id == local.graph_resource_app_id] : []
+  other_application_permissions = local.has_application_permissions ? [for item in local.application_permissions : item if item.resource_app_id != local.graph_resource_app_id] : []
+  graph_user_read_access = {
+    id   = "e1fe6dd8-ba31-4d61-89e7-88639da4683d"
+    type = "Scope"
+  }
+  graph_resource_access = distinct(concat(flatten(local.graph_application_permissions[*].resource_access), [local.graph_user_read_access]))
 
   # For more public / gov differences see:
   #   https://docs.microsoft.com/en-us/azure/azure-government/compare-azure-government-global-azure
-  functions_baseurl                  = var.azure_environment == "usgovernment" ? ".azurewebsites.us" :  ".azurewebsites.net"
-  appservices_baseurl                = var.azure_environment == "usgovernment" ? ".azurewebsites.us" :  ".azurewebsites.net"
-  trafficmanager_baseurl             = var.azure_environment == "usgovernment" ? ".usgovtrafficmanager.net" :  ".trafficmanager.net"
-  
-  trafficmanager_name                = local.full_microservice_environment_name
-  microservice_trafficmanager_url    = lower("https://${local.trafficmanager_name}${local.trafficmanager_baseurl}")
-  
-  appservice_callback_urls           = [for item in local.appservice_plans : lower("https://${var.name}-${item.location}-${var.environment_name}${local.appservices_baseurl}${var.callback_path}")]
-  function_callback_urls             = [for item in local.function_appservice_plans : lower("https://${var.name}-function-${item.location}-${var.environment_name}${local.functions_baseurl}${var.callback_path}")]
-  trafficmanager_callback_urls       = [lower("${local.microservice_trafficmanager_url}/"), lower("${local.microservice_trafficmanager_url}${var.callback_path}")]
-  
-  application_callback_urls          = concat(tolist(local.trafficmanager_callback_urls),tolist(local.appservice_callback_urls),tolist(local.function_callback_urls))
+  functions_baseurl      = var.azure_environment == "usgovernment" ? ".azurewebsites.us" : ".azurewebsites.net"
+  appservices_baseurl    = var.azure_environment == "usgovernment" ? ".azurewebsites.us" : ".azurewebsites.net"
+  trafficmanager_baseurl = var.azure_environment == "usgovernment" ? ".usgovtrafficmanager.net" : ".trafficmanager.net"
+
+  trafficmanager_name             = local.full_microservice_environment_name
+  microservice_trafficmanager_url = lower("https://${local.trafficmanager_name}${local.trafficmanager_baseurl}")
+
+  appservice_callback_urls     = [for item in local.appservice_plans : lower("https://${var.name}-${item.location}-${var.environment_name}${local.appservices_baseurl}${var.callback_path}")]
+  function_callback_urls       = [for item in local.function_appservice_plans : lower("https://${var.name}-function-${item.location}-${var.environment_name}${local.functions_baseurl}${var.callback_path}")]
+  trafficmanager_callback_urls = [lower("${local.microservice_trafficmanager_url}/"), lower("${local.microservice_trafficmanager_url}${var.callback_path}")]
+
+  application_callback_urls = concat(tolist(local.trafficmanager_callback_urls), tolist(local.appservice_callback_urls), tolist(local.function_callback_urls))
 
   # 24 characters is used for max key vault and storage account names
-  max_name_length                      = 24
+  max_name_length = 24
 
   max_environment_differentiator_short = local.max_name_length - (length(var.name) + length(var.environment) + 2)
   environment_differentiator_short     = local.max_environment_differentiator_short > 0 ? length(var.environment_differentiator) <= local.max_environment_differentiator_short ? var.environment_differentiator : substr(var.environment_differentiator, 0, local.max_environment_differentiator_short) : ""
-  
+
   max_environment_differentiator_short_withservice = local.max_name_length - (length(var.service_name) + length(var.name) + length(var.environment) + 2)
   environment_differentiator_short_withservice     = local.max_environment_differentiator_short_withservice > 0 ? length(var.environment_differentiator) <= local.max_environment_differentiator_short_withservice ? var.environment_differentiator : substr(var.environment_differentiator, 0, local.max_environment_differentiator_short_withservice) : ""
-  
+
   key_vault_access_policies = [
     {
       tenant_id = var.azurerm_client_config.tenant_id
-      object_id = var.azurerm_client_config.object_id
+      object_id = var.executing_object_id
 
       certificate_permissions = var.key_vault_permissions.certificate_permissions
       key_permissions         = var.key_vault_permissions.key_permissions
@@ -148,7 +148,7 @@ resource "azurerm_key_vault" "microservice" {
 
   access_policy {
     tenant_id = var.azurerm_client_config.tenant_id
-    object_id = var.azurerm_client_config.object_id
+    object_id = var.executing_object_id
 
     certificate_permissions = var.key_vault_permissions.certificate_permissions
     key_permissions         = var.key_vault_permissions.key_permissions
@@ -170,7 +170,7 @@ resource "azurerm_key_vault" "microservice" {
 
   # access_policy {
   #   tenant_id = var.azurerm_client_config.tenant_id
-  #   object_id = var.azurerm_client_config.object_id
+  #   object_id = var.executing_object_id
 
   #   certificate_permissions = var.key_vault_permissions.certificate_permissions
   #   key_permissions         = var.key_vault_permissions.key_permissions
@@ -224,25 +224,25 @@ resource "azuread_application" "microservice" {
   # Post used to find the correct "magic" Guids
   # https://partlycloudy.blog/2019/12/15/fully-automated-creation-of-an-aad-integrated-kubernetes-cluster-with-terraform/
   required_resource_access {
-      resource_app_id = local.graph_resource_app_id
+    resource_app_id = local.graph_resource_app_id
 
-      dynamic "resource_access" {
-        for_each = toset(local.graph_resource_access)
-        content{
-          id   = resource_access.key.id
-          type = resource_access.key.type
-        }
+    dynamic "resource_access" {
+      for_each = toset(local.graph_resource_access)
+      content {
+        id   = resource_access.key.id
+        type = resource_access.key.type
       }
     }
-  
-  dynamic "required_resource_access"{
+  }
+
+  dynamic "required_resource_access" {
     for_each = toset(local.other_application_permissions)
     content {
       resource_app_id = required_resource_access.key.resource_app_id
 
       dynamic "resource_access" {
         for_each = toset(required_resource_access.key.resource_access)
-        content{
+        content {
           id   = resource_access.key.id
           type = resource_access.key.type
         }
@@ -480,15 +480,15 @@ resource "azurerm_app_service" "microservice" {
 
     content {
       enabled = true
-      active_directory  {
-          client_id = azuread_application.microservice.application_id
-          allowed_audiences = [ 
-            "https://${var.name}-${each.value.location}-${var.environment_name}${local.appservices_baseurl}",
-              local.microservice_trafficmanager_url 
-            ]
+      active_directory {
+        client_id = azuread_application.microservice.application_id
+        allowed_audiences = [
+          "https://${var.name}-${each.value.location}-${var.environment_name}${local.appservices_baseurl}",
+          local.microservice_trafficmanager_url
+        ]
       }
       default_provider = "AzureActiveDirectory"
-      issuer = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
+      issuer           = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
     }
   }
 }
@@ -524,21 +524,21 @@ resource "azurerm_function_app" "microservice" {
     type         = local.appservice_identity_type
     identity_ids = local.user_assigned_identity_ids
   }
-  
+
   dynamic "auth_settings" {
     for_each = var.require_auth ? [var.require_auth] : []
 
     content {
       enabled = true
-      active_directory  {
-         client_id = azuread_application.microservice.application_id
-         allowed_audiences = [ 
-           "https://${var.name}-function-${each.value.location}-${var.environment_name}${local.functions_baseurl}",
-           local.microservice_trafficmanager_url  
-           ]
+      active_directory {
+        client_id = azuread_application.microservice.application_id
+        allowed_audiences = [
+          "https://${var.name}-function-${each.value.location}-${var.environment_name}${local.functions_baseurl}",
+          local.microservice_trafficmanager_url
+        ]
       }
       default_provider = "AzureActiveDirectory"
-      issuer = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
+      issuer           = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
     }
   }
 
@@ -619,7 +619,7 @@ resource "azurerm_function_app_slot" "microservice" {
 }
 
 ### Static Site
-  resource "azurerm_storage_account" "microservice" {
+resource "azurerm_storage_account" "microservice" {
   count = local.has_static_site ? 1 : 0
 
   name                      = local.environment_differentiator_short_withservice != "" ? "${var.service_name}${var.name}${local.environment_differentiator_short_withservice}${var.environment}" : "${var.service_name}${var.name}${var.environment}"
@@ -631,11 +631,11 @@ resource "azurerm_function_app_slot" "microservice" {
   enable_https_traffic_only = true
   min_tls_version           = var.static_site.storage_tls_version
   custom_domain {
-    name                    = var.static_site.domain != null ? var.static_site.domain : ""
+    name = var.static_site.domain != null ? var.static_site.domain : ""
   }
   static_website {
-    index_document          = var.static_site.index_document
-    error_404_document      = coalesce(var.static_site.error_document,var.static_site.index_document)
+    index_document     = var.static_site.index_document
+    error_404_document = coalesce(var.static_site.error_document, var.static_site.index_document)
   }
 }
 ### Traffic Manager
