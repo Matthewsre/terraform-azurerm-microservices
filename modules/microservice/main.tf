@@ -590,6 +590,22 @@ resource "azurerm_function_app_slot" "microservice" {
   ]
 }
 
+### Custom Domain for App Services
+locals {
+  app_service_names  = [for item in azurerm_app_service.microservice : item.name]
+  function_appservice_names  = [for item in azurerm_function_app.microservice : item.name]
+  all_app_service_names = concat(tolist(local.app_service_names),tolist(local.function_appservice_names))
+  custom_domain_app_service_names = local.has_custom_domain ? local.all_app_service_names : []
+}
+
+resource "azurerm_app_service_custom_hostname_binding" "microservice" {
+  for_each = toset(local.custom_domain_app_service_names)
+  
+  hostname            = var.custom_domain
+  app_service_name    = each.key
+  resource_group_name = var.resource_group_name
+}
+
 ### Static Site
   resource "azurerm_storage_account" "microservice" {
   count = local.has_static_site ? 1 : 0
