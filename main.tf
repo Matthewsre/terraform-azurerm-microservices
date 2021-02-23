@@ -43,6 +43,21 @@ data "azuread_domains" "default" {
   only_default = true
 }
 
+data "azuread_users" "owners" {
+  user_principal_names = var.application_owner_user_principal_names
+  ignore_missing = true
+}
+
+data "azuread_group" "owner_groups" {
+  for_each = zipmap(var.application_owner_group_object_ids,var.application_owner_group_object_ids)
+  object_id = each.value
+}
+
+data "azuread_users" "owner_groups_users" {
+  object_ids = flatten([for item in data.azuread_group.owner_groups: item.members])
+  ignore_missing = true
+}
+
 locals {
   azuread_domain                           = data.azuread_domains.default.domains[0].domain_name
   primary_region                           = var.primary_region != "" ? var.primary_region : var.regions[0]
@@ -71,6 +86,9 @@ locals {
   lookup_ip_address  = local.include_ip_address && var.ip_address == ""
 
   azure_easyauth_callback                 = "/.auth/login/aad/callback"
+
+  owner_group_members                     = data.azuread_users.owner_groups_users!= null ? tolist(data.azuread_users.owner_groups_users.object_ids):[]
+  application_owners                      = distinct(concat(local.owner_group_members, data.azuread_users.owners.object_ids,[data.azurerm_client_config.current.object_id]))
 
   # 24 characters is used for max storage name
   max_storage_name_length              = 24
@@ -419,6 +437,7 @@ module "microservice" {
   appservice                      = each.value.appservice
   function                        = each.value.function
   require_auth                    = each.value.require_auth == null ? false : each.value.require_auth
+  application_owners              = local.application_owners
   sql                             = each.value.sql
   roles                           = each.value.roles
   http                            = each.value.http
