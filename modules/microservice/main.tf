@@ -30,6 +30,7 @@ locals {
   has_http                           = var.http != null
   http_target                        = local.has_http ? var.http.target : local.has_appservice ? "appservice" : local.has_function ? "function" : null
   consumers                          = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
+  has_consumers                      = length(local.consumers) > 0
   has_static_site                    = var.static_site !=null
 
   # For more public / gov differences see:
@@ -237,6 +238,19 @@ resource "azuread_application_app_role" "microservice" {
   display_name          = each.value
   is_enabled            = true
   value                 = each.value
+}
+
+resource "azuread_application_oauth2_permission" "microservice" {
+  count = local.has_consumers? 1 : 0
+  
+  application_object_id      = azuread_application.microservice.id
+  admin_consent_description  = "Allow the application to access ${azuread_application.microservice.display_name} on behalf of the signed-in user."
+  admin_consent_display_name = "Access ${azuread_application.microservice.display_name}"
+  is_enabled                 = true
+  type                       = "User"
+  user_consent_description   = "Allow the application to access ${azuread_application.microservice.display_name} on your behalf"
+  user_consent_display_name  = "Access ${azuread_application.microservice.display_name}"
+  value                      = "user_impersonation"
 }
 
 ### SQL Database
