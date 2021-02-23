@@ -32,6 +32,7 @@ locals {
   consumers                          = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
   has_static_site                    = var.static_site !=null
   has_custom_domain                  = var.custom_domain != null && var.custom_domain != ""
+  ssl_certificate_source             = var.ssl_certificate_source != null ? lower(var.ssl_certificate_source) : ""
 
   # For more public / gov differences see:
   #   https://docs.microsoft.com/en-us/azure/azure-government/compare-azure-government-global-azure
@@ -604,6 +605,12 @@ resource "azurerm_app_service_custom_hostname_binding" "microservice" {
   hostname            = var.custom_domain
   app_service_name    = each.key
   resource_group_name = var.resource_group_name
+}
+
+resource "azurerm_app_service_managed_certificate" "microservice" {
+  for_each = local.ssl_certificate_source == "appservicemanaged" ? azurerm_app_service_custom_hostname_binding.microservice : {}
+
+  custom_hostname_binding_id = each.value.id
 }
 
 ### Static Site

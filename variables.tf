@@ -100,29 +100,30 @@ variable "signed_out_callback_path" {
 variable "microservices" {
   description = "This will describe your microservices to determine which resources are needed"
   type = list(object({
-    name          = string
-    appservice    = optional(string)
-    function      = optional(string)
-    require_auth  = optional(bool)
-    sql           = optional(string)
-    roles         = optional(list(string))
-    custom_domain = optional(string)
-    http = optional(object({
-      target    = string
-      consumers = list(string)
+    name                    = string
+    appservice              = optional(string)
+    function                = optional(string)
+    require_auth            = optional(bool)
+    sql                     = optional(string)
+    roles                   = optional(list(string))
+    custom_domain           = optional(string)
+    ssl_certificate_source  = optional(string)
+    http                    = optional(object({
+      target              = string
+      consumers           = list(string)
     }))
-    queues = optional(list(object({
-      name       = string
-      publishers = list(string)
+    queues                  = optional(list(object({
+      name                = string
+      publishers          = list(string)
     })))
-    cosmos_containers = optional(list(object({
+    cosmos_containers       = optional(list(object({
       name               = string
       partition_key_path = string
       max_throughput     = number
     })))
-    static_site = optional(object({
-      index_document                = string
-      error_document                = string
+    static_site             = optional(object({
+      index_document     = string
+      error_document     = string
     }))
   }))
 }

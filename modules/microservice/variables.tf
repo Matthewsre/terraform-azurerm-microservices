@@ -338,3 +338,8 @@ variable "custom_domain" {
   description = "Custom domain where the service is exposed at"
   type        = string
 }
+
+variable "ssl_certificate_source" {
+  description = "Source to retrieve an ssl certificate for the service"
+  type        = string
+}

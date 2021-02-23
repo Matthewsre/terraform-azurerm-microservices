@@ -470,6 +470,7 @@ module "microservice" {
   appservice_deployment_slots     = var.appservice_deployment_slots
   consumption_appservice_plans    = azurerm_app_service_plan.service_consumption
   custom_domain                   = each.value.custom_domain
+  ssl_certificate_source          = each.value.ssl_certificate_source
   static_site                     = each.value.static_site != null ? {
                                         index_document              = each.value.static_site.index_document
                                         error_document              = each.value.static_site.error_document
