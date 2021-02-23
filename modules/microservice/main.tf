@@ -271,7 +271,7 @@ resource "azuread_application_app_role" "microservice" {
 }
 
 resource "azuread_application_oauth2_permission" "microservice" {
-  count = local.has_consumers? 1 : 0
+  count = local.has_consumers && var.require_auth ? 1 : 0
   
   application_object_id      = azuread_application.microservice.id
   admin_consent_description  = "Allow the application to access ${azuread_application.microservice.display_name} on behalf of the signed-in user."
