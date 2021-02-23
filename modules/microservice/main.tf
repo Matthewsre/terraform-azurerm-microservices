@@ -31,6 +31,17 @@ locals {
   http_target                        = local.has_http ? var.http.target : local.has_appservice ? "appservice" : local.has_function ? "function" : null
   consumers                          = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
   has_static_site                    = var.static_site !=null
+  has_application_permissions        = var.application_permissions != null
+  application_permissions            = local.has_application_permissions ? var.application_permissions : []
+
+  graph_resource_app_id              = "00000003-0000-0000-c000-000000000000"
+  graph_application_permissions      = local.has_application_permissions ? [for item in local.application_permissions: item if item.resource_app_id == local.graph_resource_app_id] : []
+  other_application_permissions      = local.has_application_permissions ? [for item in local.application_permissions: item if item.resource_app_id != local.graph_resource_app_id]:[]
+  graph_user_read_access             =  {
+                                        id="e1fe6dd8-ba31-4d61-89e7-88639da4683d" 
+                                        type="Scope"
+                                        }
+  graph_resource_access              = distinct(concat(flatten(local.graph_application_permissions[*].resource_access),[local.graph_user_read_access]))
 
   # For more public / gov differences see:
   #   https://docs.microsoft.com/en-us/azure/azure-government/compare-azure-government-global-azure
@@ -213,10 +224,29 @@ resource "azuread_application" "microservice" {
   # Post used to find the correct "magic" Guids
   # https://partlycloudy.blog/2019/12/15/fully-automated-creation-of-an-aad-integrated-kubernetes-cluster-with-terraform/
   required_resource_access {
-    resource_app_id = "00000003-0000-0000-c000-000000000000"
-    resource_access {
-      id   = "e1fe6dd8-ba31-4d61-89e7-88639da4683d"
-      type = "Scope"
+      resource_app_id = local.graph_resource_app_id
+
+      dynamic "resource_access" {
+        for_each = toset(local.graph_resource_access)
+        content{
+          id   = resource_access.key.id
+          type = resource_access.key.type
+        }
+      }
+    }
+  
+  dynamic "required_resource_access"{
+    for_each = toset(local.other_application_permissions)
+    content {
+      resource_app_id = required_resource_access.key.resource_app_id
+
+      dynamic "resource_access" {
+        for_each = toset(required_resource_access.key.resource_access)
+        content{
+          id   = resource_access.key.id
+          type = resource_access.key.type
+        }
+      }
     }
   }
 

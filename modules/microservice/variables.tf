@@ -52,6 +52,18 @@ variable "application_owners" {
   default     = []
 }
 
+variable "application_permissions"{
+  description = "Additional permissions to be added to the application"
+  type = list(object({
+      resource_app_id = string
+      resource_access = list(object({
+        id   = string
+        type = string
+      })
+    )}))
+  default = []
+}
+
 variable "environment" {
   description = "Terrform environment we're acting in"
   type        = string
