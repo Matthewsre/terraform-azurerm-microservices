@@ -603,7 +603,7 @@ resource "azurerm_function_app_slot" "microservice" {
   enable_https_traffic_only = true
   min_tls_version           = var.static_site.storage_tls_version
   custom_domain {
-    name                    = var.has_custom_domain ? var.custom_domain : ""
+    name                    = local.has_custom_domain ? var.custom_domain : ""
   }
   static_website {
     index_document          = var.static_site.index_document
