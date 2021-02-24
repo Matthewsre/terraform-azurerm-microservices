@@ -180,9 +180,12 @@ variable "custom_domain" {
   default     = ""
 }
 
-variable "ssl_certificate_source" {
-  description = "Source to retrieve an ssl certificate for the service"
-  type        = string
+variable "tls_certificate" {
+  description = "Source to retrieve an tls/ssl certificate for the service"
+  type        = object({
+      source        = string
+      secret_id     = optional(string)
+    })
 }
 
 variable "azuread_instance" {

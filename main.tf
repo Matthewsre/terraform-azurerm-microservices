@@ -445,7 +445,7 @@ module "microservice" {
   http                            = each.value.http
   scopes                          = each.value.scopes
   custom_domain                   = each.value.custom_domain
-  ssl_certificate_source          = each.value.ssl_certificate_source
+  tls_certificate                 = each.value.tls_certificate
   cosmos_containers               = each.value.cosmos_containers == null ? [] : each.value.cosmos_containers
   queues                          = each.value.queues == null ? [] : each.value.queues
   resource_group_name             = local.resource_group_name

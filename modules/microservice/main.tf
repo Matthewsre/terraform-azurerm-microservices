@@ -32,7 +32,7 @@ locals {
   consumers                          = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
   has_static_site                    = var.static_site != null
   has_custom_domain                  = var.custom_domain != null && var.custom_domain != ""
-  ssl_certificate_source             = var.ssl_certificate_source != null ? lower(var.ssl_certificate_source) : ""
+  tls_certificate_source             = var.tls_certificate != null ? var.tls_certificate.source != null ? lower(var.tls_certificate.source) : "" : ""
   has_application_permissions        = var.application_permissions != null
   application_permissions            = local.has_application_permissions ? var.application_permissions : []
   application_scopes                 = var.scopes != null ? var.scopes : []
@@ -658,9 +658,26 @@ resource "azurerm_app_service_custom_hostname_binding" "microservice" {
 }
 
 resource "azurerm_app_service_managed_certificate" "microservice" {
-  for_each = local.ssl_certificate_source == "appservicemanaged" ? azurerm_app_service_custom_hostname_binding.microservice : {}
+  for_each = local.tls_certificate_source == "appservicemanaged" ? azurerm_app_service_custom_hostname_binding.microservice : {}
 
   custom_hostname_binding_id = each.value.id
+}
+
+resource "azurerm_app_service_certificate" "microservice" {
+  count = local.tls_certificate_source == "keyvault" ? 1 : 0
+
+  name                = local.full_microservice_environment_name
+  resource_group_name = var.resource_group_name
+  location            = var.primary_region
+  key_vault_secret_id = var.tls_certificate.secret_id
+}
+
+resource "azurerm_app_service_certificate_binding" "microservice" {
+  for_each = local.tls_certificate_source == "keyvault" ? azurerm_app_service_custom_hostname_binding.microservice : {}
+
+  hostname_binding_id = each.value.id
+  certificate_id      = azurerm_app_service_certificate.microservice[0].id
+  ssl_state           = "SniEnabled"
 }
 
 ### Static Site
