@@ -52,15 +52,15 @@ variable "application_owners" {
   default     = []
 }
 
-variable "application_permissions"{
+variable "application_permissions" {
   description = "Additional permissions to be added to the application"
   type = list(object({
-      resource_app_id = string
-      resource_access = list(object({
-        id   = string
-        type = string
+    resource_app_id = string
+    resource_access = list(object({
+      id   = string
+      type = string
       })
-    )}))
+  ) }))
   default = []
 }
 
@@ -146,6 +146,17 @@ variable "sql" {
     condition     = var.sql == null ? true : contains(["", "server", "elastic"], lower(var.sql))
     error_message = "Value must be '', 'server', or 'elastic'."
   }
+}
+
+variable "scopes" {
+  description = "Scopes to define on the application"
+  type = list(object({
+    id          = string
+    type        = optional(string)
+    name        = optional(string)
+    description = optional(string)
+  }))
+  default = []
 }
 
 variable "http" {
@@ -333,16 +344,16 @@ variable "key_vault_network_acls" {
   default = null
 }
 
-variable "static_site" { 
+variable "static_site" {
   description = "Defines the static site settings"
   type = object({
-      index_document                = string
-      error_document                = string
-      domain                        = string
-      storage_kind                  = string
-      storage_tier                  = string
-      storage_replication_type      = string
-      storage_tls_version           = string
-    })
+    index_document           = string
+    error_document           = string
+    domain                   = string
+    storage_kind             = string
+    storage_tier             = string
+    storage_replication_type = string
+    storage_tls_version      = string
+  })
   default = null
 }

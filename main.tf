@@ -45,16 +45,16 @@ data "azuread_domains" "default" {
 
 data "azuread_users" "owners" {
   user_principal_names = var.application_owner_user_principal_names
-  ignore_missing = true
+  ignore_missing       = true
 }
 
 data "azuread_group" "owner_groups" {
-  for_each = zipmap(var.application_owner_group_object_ids,var.application_owner_group_object_ids)
+  for_each  = zipmap(var.application_owner_group_object_ids, var.application_owner_group_object_ids)
   object_id = each.value
 }
 
 data "azuread_users" "owner_groups_users" {
-  object_ids = flatten([for item in data.azuread_group.owner_groups: item.members])
+  object_ids     = flatten([for item in data.azuread_group.owner_groups : item.members])
   ignore_missing = true
 }
 
@@ -85,10 +85,10 @@ locals {
   include_ip_address = var.key_vault_include_ip_address == null ? local.is_dev : var.key_vault_include_ip_address == true
   lookup_ip_address  = local.include_ip_address && var.ip_address == ""
 
-  azure_easyauth_callback                 = "/.auth/login/aad/callback"
+  azure_easyauth_callback = "/.auth/login/aad/callback"
 
-  owner_group_members                     = data.azuread_users.owner_groups_users!= null ? tolist(data.azuread_users.owner_groups_users.object_ids):[]
-  application_owners                      = distinct(concat(local.owner_group_members, data.azuread_users.owners.object_ids,[data.azurerm_client_config.current.object_id]))
+  owner_group_members = data.azuread_users.owner_groups_users != null ? tolist(data.azuread_users.owner_groups_users.object_ids) : []
+  application_owners  = distinct(concat(local.owner_group_members, data.azuread_users.owners.object_ids, [data.azurerm_client_config.current.object_id]))
 
   # 24 characters is used for max storage name
   max_storage_name_length              = 24
@@ -442,6 +442,7 @@ module "microservice" {
   sql                             = each.value.sql
   roles                           = each.value.roles
   http                            = each.value.http
+  scopes                          = each.value.scopes
   cosmos_containers               = each.value.cosmos_containers == null ? [] : each.value.cosmos_containers
   queues                          = each.value.queues == null ? [] : each.value.queues
   resource_group_name             = local.resource_group_name
@@ -470,15 +471,15 @@ module "microservice" {
   appservice_plans                = azurerm_app_service_plan.service
   appservice_deployment_slots     = var.appservice_deployment_slots
   consumption_appservice_plans    = azurerm_app_service_plan.service_consumption
-  static_site                     = each.value.static_site != null ? {
-                                        index_document              = each.value.static_site.index_document
-                                        error_document              = each.value.static_site.error_document
-                                        domain                      = each.value.static_site.domain
-                                        storage_kind                = var.static_site_kind
-                                        storage_tier                = var.static_site_tier
-                                        storage_replication_type    = var.static_site_replication_type
-                                        storage_tls_version         = var.static_site_tls_version
-                                      }: null
+  static_site = each.value.static_site != null ? {
+    index_document           = each.value.static_site.index_document
+    error_document           = each.value.static_site.error_document
+    domain                   = each.value.static_site.domain
+    storage_kind             = var.static_site_kind
+    storage_tier             = var.static_site_tier
+    storage_replication_type = var.static_site_replication_type
+    storage_tls_version      = var.static_site_tls_version
+  } : null
 
   depends_on = [
     azurerm_storage_account.service,
