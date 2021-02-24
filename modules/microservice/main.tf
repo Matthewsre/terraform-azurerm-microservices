@@ -275,10 +275,10 @@ resource "azuread_application_oauth2_permission" "microservice" {
   for_each = {for item in local.application_scopes:  item.id => item}
 
   application_object_id      = azuread_application.microservice.id
-  admin_consent_description  = each.value.description != null && each.value.description != "" ? each.value.description : "Allow the application to access ${azuread_application.microservice.display_name} with ${each.key.id} permission"
-  admin_consent_display_name = each.value.name != null && each.value.name != "" ? each.value.name : "Access ${azuread_application.microservice.display_name} with ${each.key.id} permission"
-  user_consent_description   = each.value.description != null && each.value.description != "" ? each.value.description : "Allow the application to access ${azuread_application.microservice.display_name} with ${each.key.id} permission"
-  user_consent_display_name  = each.value.name != null && each.value.name != "" ? each.value.name : "Access ${azuread_application.microservice.display_name} with ${each.key.id} permission"
+  admin_consent_description  = each.value.description != null && each.value.description != "" ? each.value.description : "Allow the application to access ${azuread_application.microservice.display_name} with ${each.value.id} permission"
+  admin_consent_display_name = each.value.name != null && each.value.name != "" ? each.value.name : "Access ${azuread_application.microservice.display_name} with ${each.value.id} permission"
+  user_consent_description   = each.value.description != null && each.value.description != "" ? each.value.description : "Allow the application to access ${azuread_application.microservice.display_name} with ${each.value.id} permission"
+  user_consent_display_name  = each.value.name != null && each.value.name != "" ? each.value.name : "Access ${azuread_application.microservice.display_name} with ${each.value.id} permission"
   is_enabled                 = true
   type                       = each.value.type != null && each.value.type != "" ? each.value.type : "Admin"
   value                      = each.value.id
