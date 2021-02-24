@@ -174,6 +174,17 @@ variable "http" {
   default = null
 }
 
+variable "custom_domain" {
+  description = "Custom domain name to use for exposing the service"
+  type        = string
+  default     = ""
+}
+
+variable "ssl_certificate_source" {
+  description = "Source to retrieve an ssl certificate for the service"
+  type        = string
+}
+
 variable "azuread_instance" {
   description = "Instance of Azure AD"
   type        = string

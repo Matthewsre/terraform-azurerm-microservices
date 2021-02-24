@@ -125,6 +125,8 @@ variable "microservices" {
       name          = string
       description   = string
     })))
+    custom_domain   = optional(string)
+    ssl_certificate_source  = optional(string)
     http = optional(object({
       target    = string
       consumers = list(string)
@@ -141,7 +143,6 @@ variable "microservices" {
     static_site = optional(object({
       index_document = string
       error_document = string
-      domain         = string
     }))
   }))
 }
