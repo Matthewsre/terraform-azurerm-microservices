@@ -33,10 +33,11 @@ locals {
   has_static_site                    = var.static_site != null
   has_application_permissions        = var.application_permissions != null
   application_permissions            = local.has_application_permissions ? var.application_permissions : []
-
-  graph_resource_app_id         = "00000003-0000-0000-c000-000000000000"
-  graph_application_permissions = local.has_application_permissions ? [for item in local.application_permissions : item if item.resource_app_id == local.graph_resource_app_id] : []
-  other_application_permissions = local.has_application_permissions ? [for item in local.application_permissions : item if item.resource_app_id != local.graph_resource_app_id] : []
+  application_scopes                 = var.scopes != null ? var.scopes : []
+  
+  graph_resource_app_id              = "00000003-0000-0000-c000-000000000000"
+  graph_application_permissions      = local.has_application_permissions ? [for item in local.application_permissions : item if item.resource_app_id == local.graph_resource_app_id] : []
+  other_application_permissions      = local.has_application_permissions ? [for item in local.application_permissions : item if item.resource_app_id != local.graph_resource_app_id] : []
   graph_user_read_access = {
     id   = "e1fe6dd8-ba31-4d61-89e7-88639da4683d"
     type = "Scope"
@@ -267,6 +268,19 @@ resource "azuread_application_app_role" "microservice" {
   display_name          = each.value
   is_enabled            = true
   value                 = each.value
+}
+
+resource "azuread_application_oauth2_permission" "microservice" {
+  for_each = {for item in local.application_scopes:  item.id => item}
+
+  application_object_id      = azuread_application.microservice.id
+  admin_consent_description  = each.value.description != null && each.value.description != "" ? each.value.description : "Allow the application to access ${azuread_application.microservice.display_name} with ${each.value.id} permission"
+  admin_consent_display_name = each.value.name != null && each.value.name != "" ? each.value.name : "Access ${azuread_application.microservice.display_name} with ${each.value.id} permission"
+  user_consent_description   = each.value.description != null && each.value.description != "" ? each.value.description : "Allow the application to access ${azuread_application.microservice.display_name} with ${each.value.id} permission"
+  user_consent_display_name  = each.value.name != null && each.value.name != "" ? each.value.name : "Access ${azuread_application.microservice.display_name} with ${each.value.id} permission"
+  is_enabled                 = true
+  type                       = each.value.type != null && each.value.type != "" ? each.value.type : "Admin"
+  value                      = each.value.id
 }
 
 ### SQL Database

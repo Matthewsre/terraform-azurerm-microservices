@@ -154,6 +154,17 @@ variable "sql" {
   }
 }
 
+variable "scopes" {
+  description = "Scopes to define on the application"
+  type = list(object({
+    id          = string
+    type        = optional(string)
+    name        = optional(string)
+    description = optional(string)
+  }))
+  default = []
+}
+
 variable "http" {
   description = "Target option for http traffic manager configuration and optional consumers to request role"
   type = object({
