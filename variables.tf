@@ -119,6 +119,12 @@ variable "microservices" {
         type = string
         })
     ) })))
+    scopes = optional(list(object({
+      id            = string
+      type          = string
+      name          = string
+      description   = string
+    })))
     http = optional(object({
       target    = string
       consumers = list(string)
