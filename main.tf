@@ -508,9 +508,11 @@ module "microservice_traffic" {
   source   = "./modules/traffic"
   for_each = var.exclude_hosts ? {} : module.microservice
 
-  name                     = each.value.traffic_data.microservice_environment_name
-  resource_group_name      = local.resource_group_name
-  azure_endpoint_resources = each.value.traffic_data.azure_endpoint_resources
+  name                      = each.value.traffic_data.microservice_environment_name
+  resource_group_name       = local.resource_group_name
+  azure_endpoint_resources  = each.value.traffic_data.azure_endpoint_resources
+  static_endpoint_resources = each.value.traffic_data.static_endpoint_resources
+  custom_domain             = each.value.traffic_data.custom_domain
 
   depends_on = [
     module.microservice,

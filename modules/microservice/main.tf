@@ -51,17 +51,23 @@ locals {
   functions_baseurl      = var.azure_environment == "usgovernment" ? ".azurewebsites.us" : ".azurewebsites.net"
   appservices_baseurl    = var.azure_environment == "usgovernment" ? ".azurewebsites.us" : ".azurewebsites.net"
   trafficmanager_baseurl = var.azure_environment == "usgovernment" ? ".usgovtrafficmanager.net" : ".trafficmanager.net"
+  frontdoor_baseurl      = var.azure_environment == "usgovernment" ? ".azurefd.us" : ".azurefd.net"
 
   trafficmanager_name             = local.full_microservice_environment_name
   microservice_trafficmanager_url = lower("https://${local.trafficmanager_name}${local.trafficmanager_baseurl}")
 
+  frontdoor_name             = local.full_microservice_environment_name
+  microservice_frontdoor_url = lower("https://${local.frontdoor_name}${local.frontdoor_baseurl}")
+
   appservice_callback_urls     = [for item in local.appservice_plans : lower("https://${var.name}-${item.location}-${var.environment_name}${local.appservices_baseurl}${var.callback_path}")]
   function_callback_urls       = [for item in local.function_appservice_plans : lower("https://${var.name}-function-${item.location}-${var.environment_name}${local.functions_baseurl}${var.callback_path}")]
   trafficmanager_callback_urls = [lower("${local.microservice_trafficmanager_url}/"), lower("${local.microservice_trafficmanager_url}${var.callback_path}")]
-  custom_domain_callback_urls  = local.has_custom_domain ? ["https://${var.custom_domain}${var.callback_path}"] : []
+  frontdoor_callback_urls      = [lower("${local.microservice_frontdoor_url}/"), lower("${local.microservice_frontdoor_url}${var.callback_path}")]
+
+  custom_domain_callback_urls = local.has_custom_domain ? ["https://${var.custom_domain}${var.callback_path}"] : []
 
 
-  application_callback_urls = concat(tolist(local.trafficmanager_callback_urls), tolist(local.appservice_callback_urls), tolist(local.function_callback_urls), local.custom_domain_callback_urls)
+  application_callback_urls = concat(tolist(local.trafficmanager_callback_urls), tolist(local.appservice_callback_urls), tolist(local.function_callback_urls), tolist(local.frontdoor_callback_urls), local.custom_domain_callback_urls)
 
   # 24 characters is used for max key vault and storage account names
   max_name_length = 24
@@ -685,4 +691,8 @@ locals {
   app_service_endpoint_resources  = local.http_target == "appservice" ? { for appservice in azurerm_app_service.microservice : appservice.location => { id = appservice.id, location = appservice.location } } : {}
   function_app_endpoint_resources = local.http_target == "function" ? { for function in azurerm_function_app.microservice : function.location => { id = function.id, location = function.location } } : {}
   azure_endpoint_resources        = merge(local.app_service_endpoint_resources, local.function_app_endpoint_resources)
+
+  static_endpoint_primary_resources   = local.has_static_site ? { for site in azurerm_storage_account.microservice : site.primary_web_host => { id = site.id, host = site.primary_web_host } if site.static_website != null } : {}
+  static_endpoint_secondary_resources = local.has_static_site ? { for site in azurerm_storage_account.microservice : site.secondary_web_host => { id = site.id, host = site.secondary_web_host } if site.static_website != null } : {}
+  static_endpoint_resources           = merge(local.static_endpoint_primary_resources, local.static_endpoint_secondary_resources)
 }
