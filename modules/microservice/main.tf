@@ -31,6 +31,7 @@ locals {
   http_target                        = local.has_http ? var.http.target : local.has_appservice ? "appservice" : local.has_function ? "function" : null
   consumers                          = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
   has_static_site                    = var.static_site != null
+  has_custom_domain                  = var.custom_domain != null && var.custom_domain != ""
   has_application_permissions        = var.application_permissions != null
   application_permissions            = local.has_application_permissions ? var.application_permissions : []
   application_scopes                 = var.scopes != null ? var.scopes : []
@@ -668,7 +669,7 @@ resource "azurerm_storage_account" "microservice" {
   enable_https_traffic_only = true
   min_tls_version           = var.static_site.storage_tls_version
   custom_domain {
-    name = var.custom_domain != null ? var.custom_domain : ""
+    name = local.has_custom_domain ? var.custom_domain : ""
   }
   static_website {
     index_document     = var.static_site.index_document
