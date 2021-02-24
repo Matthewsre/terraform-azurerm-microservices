@@ -13,6 +13,7 @@ output "traffic_data" {
   value = {
     microservice_environment_name = local.trafficmanager_name
     azure_endpoint_resources      = local.azure_endpoint_resources
+    custom_domain                 = var.custom_domain
   }
 }
 
