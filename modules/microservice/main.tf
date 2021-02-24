@@ -56,8 +56,10 @@ locals {
   appservice_callback_urls     = [for item in local.appservice_plans : lower("https://${var.name}-${item.location}-${var.environment_name}${local.appservices_baseurl}${var.callback_path}")]
   function_callback_urls       = [for item in local.function_appservice_plans : lower("https://${var.name}-function-${item.location}-${var.environment_name}${local.functions_baseurl}${var.callback_path}")]
   trafficmanager_callback_urls = [lower("${local.microservice_trafficmanager_url}/"), lower("${local.microservice_trafficmanager_url}${var.callback_path}")]
+  custom_domain_callback_urls  = local.has_custom_domain ? ["https://${var.custom_domain}${var.callback_path}"] : []
 
-  application_callback_urls = concat(tolist(local.trafficmanager_callback_urls), tolist(local.appservice_callback_urls), tolist(local.function_callback_urls))
+
+  application_callback_urls = concat(tolist(local.trafficmanager_callback_urls), tolist(local.appservice_callback_urls), tolist(local.function_callback_urls), local.custom_domain_callback_urls)
 
   # 24 characters is used for max key vault and storage account names
   max_name_length = 24
@@ -630,6 +632,27 @@ resource "azurerm_function_app_slot" "microservice" {
     azurerm_function_app.microservice,
     time_sleep.delay_before_creating_slots
   ]
+}
+
+locals {
+  app_service_names               = [for item in azurerm_app_service.microservice : item.name]
+  function_appservice_names       = [for item in azurerm_function_app.microservice : item.name]
+  all_app_service_names           = concat(tolist(local.app_service_names), tolist(local.function_appservice_names))
+  custom_domain_app_service_names = local.has_custom_domain ? local.all_app_service_names : []
+}
+
+resource "azurerm_app_service_custom_hostname_binding" "microservice" {
+  for_each = toset(local.custom_domain_app_service_names)
+
+  hostname            = var.custom_domain
+  app_service_name    = each.key
+  resource_group_name = var.resource_group_name
+}
+
+resource "azurerm_app_service_managed_certificate" "microservice" {
+  for_each = local.ssl_certificate_source == "appservicemanaged" ? azurerm_app_service_custom_hostname_binding.microservice : {}
+
+  custom_hostname_binding_id = each.value.id
 }
 
 ### Static Site
