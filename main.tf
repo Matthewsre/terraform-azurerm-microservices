@@ -80,6 +80,7 @@ locals {
   sql_server_elastic_regions               = local.has_sql_server_elastic ? local.sql_server_regions : []
   admin_login                              = "${var.service_name}-admin"
   has_sql_admin                            = var.sql_azuread_administrator != ""
+  create_sql_admin                         = !local.has_sql_admin && var.create_sql_admin
   key_vault_developer_user_principal_names = local.is_dev ? var.key_vault_developer_user_principal_names : []
   has_key_vault_developers                 = length(local.key_vault_developer_user_principal_names) > 0
 
@@ -331,7 +332,7 @@ resource "azurerm_key_vault_secret" "sql_admin_password" {
 }
 
 resource "azuread_group" "sql_admin" {
-  count        = local.has_sql_server && !local.has_sql_admin ? 1 : 0
+  count        = local.has_sql_server && (!local.has_sql_admin && var.create_sql_admin) ? 1 : 0
   display_name = "${local.admin_login}-sql"
 }
 locals {
@@ -349,9 +350,13 @@ resource "azurerm_mssql_server" "service" {
   version                      = var.sql_version
   minimum_tls_version          = var.sql_minimum_tls_version
 
-  azuread_administrator {
-    login_username = "AzureAD Admin"
-    object_id      = local.sql_azuread_administrator
+  dynamic "azuread_administrator" {
+    for_each = try(coalesce(local.sql_azuread_administrator), [])
+
+    content {
+      login_username = "AzureAD Admin"
+      object_id      = each.key
+    }
   }
 
 }

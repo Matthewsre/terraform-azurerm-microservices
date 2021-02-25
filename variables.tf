@@ -254,6 +254,12 @@ variable "sql_azuread_administrator" {
   default     = ""
 }
 
+variable "create_sql_admin" {
+  description = "Create an Azure Active Directory group to use as the SQL admin."
+  type        = bool
+  default     = true
+}
+
 variable "sql_minimum_tls_version" {
   description = "SQL Server minimum TLS version"
   type        = string
