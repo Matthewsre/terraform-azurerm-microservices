@@ -332,7 +332,7 @@ resource "azurerm_key_vault_secret" "sql_admin_password" {
 }
 
 resource "azuread_group" "sql_admin" {
-  count        = local.has_sql_server && (!local.has_sql_admin && var.create_sql_admin) ? 1 : 0
+  count        = local.has_sql_server && local.create_sql_admin ? 1 : 0
   display_name = "${local.admin_login}-sql"
 }
 locals {
