@@ -133,10 +133,10 @@ output "mapping" {
     "usgovvirginia"        = "gva"
 
     //Gov DoD Regions
-    //{displayName|name} = "{'d'}{region char(s)}" => "USDoD East" => {"USDoD" => 'd'}{"East" => "e"} => "de"
-    "USDoD East"           = "de"
-    "usdodeast"            = "de"
-    "USDoD Central"        = "dc"
-    "usdodcentral"         = "dc"
+    //{displayName|name} = "{"dod"}{region char(s)}" => "USDoD East" => {"USDoD" => "dod"}{"East" => "e"} => "dode"
+    "USDoD East"           = "dode"
+    "usdodeast"            = "dode"
+    "USDoD Central"        = "dodc"
+    "usdodcentral"         = "dodc"
   }
 }
