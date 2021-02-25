@@ -24,6 +24,10 @@ provider "azurerm" {
 
 provider "random" {}
 
+module "region_to_short_region" {
+  source = "./modules/region-to-short-region"
+}
+
 #########################
 #### Locals and Data ####
 #########################
@@ -62,6 +66,7 @@ locals {
   azuread_domain                           = data.azuread_domains.default.domains[0].domain_name
   primary_region                           = var.primary_region != "" ? var.primary_region : var.regions[0]
   secondary_region                         = var.secondary_region != "" ? var.secondary_region : length(var.regions) > 1 ? var.regions[1] : null
+  short_regions                            = [ for region in var.regions: lookup(module.region_to_short_region.mapping, region, null) ]
   service_name                             = lower(var.service_name)
   executing_object_id                      = data.azurerm_client_config.current.object_id != null && data.azurerm_client_config.current.object_id != "" ? data.azurerm_client_config.current.object_id : var.executing_object_id
   environment_name                         = local.is_dev ? "${local.environment_differentiator}-${var.environment}" : var.environment
@@ -91,10 +96,11 @@ locals {
   owner_group_members = data.azuread_users.owner_groups_users != null ? tolist(data.azuread_users.owner_groups_users.object_ids) : []
   application_owners  = distinct(concat(local.owner_group_members, data.azuread_users.owners.object_ids, [local.executing_object_id]))
 
+
   # 24 characters is used for max storage name
   max_storage_name_length              = 24
-  max_region_length                    = reverse(sort([for region in var.regions : length(region)]))[0] # bug is preventing max() from working used sort and reverse instead
-  max_environment_differentiator_short = local.max_storage_name_length - (length(local.service_name) + local.max_region_length + length(var.environment))
+  max_short_region_length              = reverse(sort([for region in local.short_regions : length(region)]))[0] # bug is preventing max() from working used sort and reverse instead
+  max_environment_differentiator_short = local.max_storage_name_length - (length(local.service_name) + local.max_short_region_length + length(var.environment))
   environment_differentiator_short     = local.max_environment_differentiator_short > 0 ? length(local.environment_differentiator) <= local.max_environment_differentiator_short ? local.environment_differentiator : substr(local.environment_differentiator, 0, local.max_environment_differentiator_short) : ""
 
   # 24 characters is used for max key vault name
@@ -282,7 +288,7 @@ resource "azurerm_key_vault" "service" {
 resource "azurerm_storage_account" "service" {
   for_each = toset(var.regions)
 
-  name                     = "${local.service_name}${each.key}${local.environment_differentiator_short}${var.environment}"
+  name                     = format("${local.service_name}%s${local.environment_differentiator_short}${var.environment}", lookup(module.region_to_short_region.mapping, each.key, null))
   resource_group_name      = local.resource_group_name
   location                 = each.key
   account_tier             = var.storage_account_tier

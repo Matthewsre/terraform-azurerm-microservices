@@ -28,7 +28,7 @@ output "locals" {
     environment_differentiator = local.environment_differentiator
     has_cosmos                 = local.has_cosmos
     has_appservice_plan        = local.has_appservice_plan
-    max_region_length          = local.max_region_length
+    max_short_region_length    = local.max_short_region_length
   }
 }
 
