@@ -513,6 +513,7 @@ module "microservice_traffic" {
   azure_endpoint_resources  = each.value.traffic_data.azure_endpoint_resources
   static_endpoint_resources = each.value.traffic_data.static_endpoint_resources
   custom_domain             = each.value.traffic_data.custom_domain
+  tls_certificate           = each.value.traffic_data.tls_certificate
 
   depends_on = [
     module.microservice,

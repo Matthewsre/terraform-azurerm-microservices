@@ -29,3 +29,12 @@ variable "custom_domain" {
   type        = string
   default     = ""
 }
+
+variable "tls_certificate" {
+  description = "Source to retrieve an tls/ssl certificate for the service"
+  type = object({
+    source      = string
+    secret_id   = optional(string)
+    keyvault_id = optional(string)
+  })
+}

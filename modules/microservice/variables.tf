@@ -185,6 +185,7 @@ variable "tls_certificate" {
   type        = object({
       source        = string
       secret_id     = optional(string)
+      keyvault_id   = optional(string)
     })
 }
 

@@ -127,8 +127,9 @@ variable "microservices" {
     })))
     custom_domain = optional(string)
     tls_certificate = optional(object({
-      source    = string
-      secret_id = string
+      source      = string
+      secret_id   = string
+      keyvault_id = string
     }))
     http = optional(object({
       target    = string

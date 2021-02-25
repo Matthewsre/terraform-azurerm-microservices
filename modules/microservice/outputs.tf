@@ -15,6 +15,7 @@ output "traffic_data" {
     azure_endpoint_resources      = local.azure_endpoint_resources
     static_endpoint_resources     = local.static_endpoint_resources
     custom_domain                 = var.custom_domain
+    tls_certificate               = var.tls_certificate
   }
 }
 
