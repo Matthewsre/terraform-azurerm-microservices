@@ -438,6 +438,7 @@ module "microservice" {
   appservice                      = each.value.appservice
   function                        = each.value.function
   require_auth                    = each.value.require_auth == null ? false : each.value.require_auth
+  application_identifier_uris     = each.value.application_identifier_uris
   application_owners              = local.application_owners
   application_permissions         = each.value.application_permissions
   sql                             = each.value.sql
