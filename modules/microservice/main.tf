@@ -31,13 +31,14 @@ locals {
   http_target                        = local.has_http ? var.http.target : local.has_appservice ? "appservice" : local.has_function ? "function" : null
   consumers                          = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
   has_static_site                    = var.static_site != null
+  allowed_origins                    = var.allowed_origins != null ? var.allowed_origins : [""]
   has_application_permissions        = var.application_permissions != null
   application_permissions            = local.has_application_permissions ? var.application_permissions : []
   application_scopes                 = var.scopes != null ? var.scopes : []
-  
-  graph_resource_app_id              = "00000003-0000-0000-c000-000000000000"
-  graph_application_permissions      = local.has_application_permissions ? [for item in local.application_permissions : item if item.resource_app_id == local.graph_resource_app_id] : []
-  other_application_permissions      = local.has_application_permissions ? [for item in local.application_permissions : item if item.resource_app_id != local.graph_resource_app_id] : []
+
+  graph_resource_app_id         = "00000003-0000-0000-c000-000000000000"
+  graph_application_permissions = local.has_application_permissions ? [for item in local.application_permissions : item if item.resource_app_id == local.graph_resource_app_id] : []
+  other_application_permissions = local.has_application_permissions ? [for item in local.application_permissions : item if item.resource_app_id != local.graph_resource_app_id] : []
   graph_user_read_access = {
     id   = "e1fe6dd8-ba31-4d61-89e7-88639da4683d"
     type = "Scope"
@@ -271,7 +272,7 @@ resource "azuread_application_app_role" "microservice" {
 }
 
 resource "azuread_application_oauth2_permission" "microservice" {
-  for_each = {for item in local.application_scopes:  item.id => item}
+  for_each = { for item in local.application_scopes : item.id => item }
 
   application_object_id      = azuread_application.microservice.id
   admin_consent_description  = each.value.description != null && each.value.description != "" ? each.value.description : "Allow the application to access ${azuread_application.microservice.display_name} with ${each.value.id} permission"
@@ -480,6 +481,9 @@ resource "azurerm_app_service" "microservice" {
     min_tls_version = "1.2"
     #dotnet_framework_version = "v5.0"
     #websockets_enabled = true # Will need for Blazor hosted appservice
+    cors {
+      allowed_origins = var.allowed_origins
+    }
   }
 
   app_settings = local.appservice_app_settings
@@ -530,6 +534,10 @@ resource "azurerm_function_app" "microservice" {
     always_on       = var.function == "plan" ? true : false
     ftps_state      = "FtpsOnly"
     min_tls_version = "1.2"
+    cors {
+      allowed_origins     = local.allowed_origins
+      support_credentials = true
+    }
   }
 
   app_settings = merge(local.appservice_app_settings, local.appservice_function_app_settings)
@@ -599,6 +607,9 @@ resource "azurerm_app_service_slot" "microservice" {
     http2_enabled            = each.value.appservice.site_config[0].http2_enabled
     websockets_enabled       = each.value.appservice.site_config[0].websockets_enabled
     always_on                = each.value.appservice.site_config[0].always_on
+    cors {
+      allowed_origins = each.value.appservice.site_config[0].cors.allowed_origins
+    }
   }
 
   depends_on = [
@@ -624,6 +635,9 @@ resource "azurerm_function_app_slot" "microservice" {
     http2_enabled      = azurerm_function_app.microservice[each.value.location].site_config[0].http2_enabled
     websockets_enabled = azurerm_function_app.microservice[each.value.location].site_config[0].websockets_enabled
     always_on          = azurerm_function_app.microservice[each.value.location].site_config[0].always_on
+    cors {
+      allowed_origins = azurerm_function_app.microservice[each.value.location].site_config[0].cors.allowed_origins
+    }
   }
 
   depends_on = [

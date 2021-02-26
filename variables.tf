@@ -112,6 +112,7 @@ variable "microservices" {
     require_auth = optional(bool)
     sql          = optional(string)
     roles        = optional(list(string))
+    allowed_origins = optional(list(string))
     application_permissions = optional(list(object({
       resource_app_id = string
       resource_access = list(object({

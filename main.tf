@@ -442,6 +442,7 @@ module "microservice" {
   application_permissions         = each.value.application_permissions
   sql                             = each.value.sql
   roles                           = each.value.roles
+  allowed_origins                 = each.value.allowed_origins
   http                            = each.value.http
   scopes                          = each.value.scopes
   cosmos_containers               = each.value.cosmos_containers == null ? [] : each.value.cosmos_containers
