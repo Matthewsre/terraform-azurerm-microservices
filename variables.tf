@@ -120,11 +120,17 @@ variable "microservices" {
         })
     ) })))
     scopes = optional(list(object({
-      id            = string
-      type          = string
-      name          = string
-      description   = string
+      id          = string
+      type        = string
+      name        = string
+      description = string
     })))
+    custom_domain = optional(string)
+    tls_certificate = optional(object({
+      source      = string
+      secret_id   = string
+      keyvault_id = string
+    }))
     http = optional(object({
       target    = string
       consumers = list(string)
@@ -141,7 +147,6 @@ variable "microservices" {
     static_site = optional(object({
       index_document = string
       error_document = string
-      domain         = string
     }))
   }))
 }
