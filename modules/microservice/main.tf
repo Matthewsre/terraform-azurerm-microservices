@@ -31,8 +31,8 @@ locals {
   http_target                        = local.has_http ? var.http.target : local.has_appservice ? "appservice" : local.has_function ? "function" : null
   consumers                          = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
   has_static_site                    = var.static_site != null
-  has_custom_domain                  = var.custom_domain != null && var.custom_domain != ""
   allowed_origins                    = var.allowed_origins != null ? var.allowed_origins : [""]
+  has_custom_domain                  = var.custom_domain != null && var.custom_domain != ""
   tls_certificate_source             = var.tls_certificate != null ? var.tls_certificate.source != null ? lower(var.tls_certificate.source) : "" : ""
   has_application_permissions        = var.application_permissions != null
   application_permissions            = local.has_application_permissions ? var.application_permissions : []
