@@ -377,3 +377,9 @@ variable "static_site" {
   })
   default = null
 }
+
+variable "allowed_origins" {
+  description = "Orgins that are allowed to access the application (CORS)"
+  type        = list(string)
+  default     = []
+}
