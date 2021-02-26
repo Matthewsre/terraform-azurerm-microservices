@@ -174,6 +174,21 @@ variable "http" {
   default = null
 }
 
+variable "custom_domain" {
+  description = "Custom domain name to use for exposing the service"
+  type        = string
+  default     = ""
+}
+
+variable "tls_certificate" {
+  description = "Source to retrieve an tls/ssl certificate for the service"
+  type        = object({
+      source        = string
+      secret_id     = optional(string)
+      keyvault_id   = optional(string)
+    })
+}
+
 variable "azuread_instance" {
   description = "Instance of Azure AD"
   type        = string
@@ -355,7 +370,6 @@ variable "static_site" {
   type = object({
     index_document           = string
     error_document           = string
-    domain                   = string
     storage_kind             = string
     storage_tier             = string
     storage_replication_type = string

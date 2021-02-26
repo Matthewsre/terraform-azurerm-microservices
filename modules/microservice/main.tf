@@ -31,7 +31,9 @@ locals {
   http_target                        = local.has_http ? var.http.target : local.has_appservice ? "appservice" : local.has_function ? "function" : null
   consumers                          = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
   has_static_site                    = var.static_site != null
+  has_custom_domain                  = var.custom_domain != null && var.custom_domain != ""
   allowed_origins                    = var.allowed_origins != null ? var.allowed_origins : [""]
+  tls_certificate_source             = var.tls_certificate != null ? var.tls_certificate.source != null ? lower(var.tls_certificate.source) : "" : ""
   has_application_permissions        = var.application_permissions != null
   application_permissions            = local.has_application_permissions ? var.application_permissions : []
   application_scopes                 = var.scopes != null ? var.scopes : []
@@ -50,15 +52,23 @@ locals {
   functions_baseurl      = var.azure_environment == "usgovernment" ? ".azurewebsites.us" : ".azurewebsites.net"
   appservices_baseurl    = var.azure_environment == "usgovernment" ? ".azurewebsites.us" : ".azurewebsites.net"
   trafficmanager_baseurl = var.azure_environment == "usgovernment" ? ".usgovtrafficmanager.net" : ".trafficmanager.net"
+  frontdoor_baseurl      = var.azure_environment == "usgovernment" ? ".azurefd.us" : ".azurefd.net"
 
   trafficmanager_name             = local.full_microservice_environment_name
   microservice_trafficmanager_url = lower("https://${local.trafficmanager_name}${local.trafficmanager_baseurl}")
 
+  frontdoor_name             = local.full_microservice_environment_name
+  microservice_frontdoor_url = lower("https://${local.frontdoor_name}${local.frontdoor_baseurl}")
+
   appservice_callback_urls     = [for item in local.appservice_plans : lower("https://${var.name}-${item.location}-${var.environment_name}${local.appservices_baseurl}${var.callback_path}")]
   function_callback_urls       = [for item in local.function_appservice_plans : lower("https://${var.name}-function-${item.location}-${var.environment_name}${local.functions_baseurl}${var.callback_path}")]
   trafficmanager_callback_urls = [lower("${local.microservice_trafficmanager_url}/"), lower("${local.microservice_trafficmanager_url}${var.callback_path}")]
+  frontdoor_callback_urls      = [lower("${local.microservice_frontdoor_url}/"), lower("${local.microservice_frontdoor_url}${var.callback_path}")]
 
-  application_callback_urls = concat(tolist(local.trafficmanager_callback_urls), tolist(local.appservice_callback_urls), tolist(local.function_callback_urls))
+  custom_domain_callback_urls = local.has_custom_domain ? ["https://${var.custom_domain}${var.callback_path}"] : []
+
+
+  application_callback_urls = concat(tolist(local.trafficmanager_callback_urls), tolist(local.appservice_callback_urls), tolist(local.function_callback_urls), tolist(local.frontdoor_callback_urls), local.custom_domain_callback_urls)
 
   # 24 characters is used for max key vault and storage account names
   max_name_length = 24
@@ -646,6 +656,44 @@ resource "azurerm_function_app_slot" "microservice" {
   ]
 }
 
+locals {
+  app_service_names               = [for item in azurerm_app_service.microservice : item.name]
+  function_appservice_names       = [for item in azurerm_function_app.microservice : item.name]
+  all_app_service_names           = concat(tolist(local.app_service_names), tolist(local.function_appservice_names))
+  custom_domain_app_service_names = local.has_custom_domain ? local.all_app_service_names : []
+}
+
+resource "azurerm_app_service_custom_hostname_binding" "microservice" {
+  for_each = toset(local.custom_domain_app_service_names)
+
+  hostname            = var.custom_domain
+  app_service_name    = each.key
+  resource_group_name = var.resource_group_name
+}
+
+resource "azurerm_app_service_managed_certificate" "microservice" {
+  for_each = local.tls_certificate_source == "appservicemanaged" ? azurerm_app_service_custom_hostname_binding.microservice : {}
+
+  custom_hostname_binding_id = each.value.id
+}
+
+resource "azurerm_app_service_certificate" "microservice" {
+  count = local.tls_certificate_source == "keyvault" ? 1 : 0
+
+  name                = local.full_microservice_environment_name
+  resource_group_name = var.resource_group_name
+  location            = var.primary_region
+  key_vault_secret_id = var.tls_certificate.secret_id
+}
+
+resource "azurerm_app_service_certificate_binding" "microservice" {
+  for_each = local.tls_certificate_source == "keyvault" ? azurerm_app_service_custom_hostname_binding.microservice : {}
+
+  hostname_binding_id = each.value.id
+  certificate_id      = azurerm_app_service_certificate.microservice[0].id
+  ssl_state           = "SniEnabled"
+}
+
 ### Static Site
 resource "azurerm_storage_account" "microservice" {
   count = local.has_static_site ? 1 : 0
@@ -658,9 +706,6 @@ resource "azurerm_storage_account" "microservice" {
   account_replication_type  = var.static_site.storage_replication_type
   enable_https_traffic_only = true
   min_tls_version           = var.static_site.storage_tls_version
-  custom_domain {
-    name = var.static_site.domain != null ? var.static_site.domain : ""
-  }
   static_website {
     index_document     = var.static_site.index_document
     error_404_document = coalesce(var.static_site.error_document, var.static_site.index_document)
@@ -674,4 +719,8 @@ locals {
   app_service_endpoint_resources  = local.http_target == "appservice" ? { for appservice in azurerm_app_service.microservice : appservice.location => { id = appservice.id, location = appservice.location } } : {}
   function_app_endpoint_resources = local.http_target == "function" ? { for function in azurerm_function_app.microservice : function.location => { id = function.id, location = function.location } } : {}
   azure_endpoint_resources        = merge(local.app_service_endpoint_resources, local.function_app_endpoint_resources)
+
+  static_endpoint_primary_resources   = local.has_static_site ? { for site in azurerm_storage_account.microservice : site.primary_web_host => { id = site.id, host = site.primary_web_host } if site.static_website != null } : {}
+  static_endpoint_secondary_resources = local.has_static_site ? { for site in azurerm_storage_account.microservice : site.secondary_web_host => { id = site.id, host = site.secondary_web_host } if site.static_website != null } : {}
+  static_endpoint_resources           = merge(local.static_endpoint_primary_resources, local.static_endpoint_secondary_resources)
 }

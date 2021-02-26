@@ -445,6 +445,8 @@ module "microservice" {
   allowed_origins                 = each.value.allowed_origins
   http                            = each.value.http
   scopes                          = each.value.scopes
+  custom_domain                   = each.value.custom_domain
+  tls_certificate                 = each.value.tls_certificate
   cosmos_containers               = each.value.cosmos_containers == null ? [] : each.value.cosmos_containers
   queues                          = each.value.queues == null ? [] : each.value.queues
   resource_group_name             = local.resource_group_name
@@ -477,7 +479,6 @@ module "microservice" {
   static_site = each.value.static_site != null ? {
     index_document           = each.value.static_site.index_document
     error_document           = each.value.static_site.error_document
-    domain                   = each.value.static_site.domain
     storage_kind             = var.static_site_kind
     storage_tier             = var.static_site_tier
     storage_replication_type = var.static_site_replication_type
@@ -508,9 +509,12 @@ module "microservice_traffic" {
   source   = "./modules/traffic"
   for_each = var.exclude_hosts ? {} : module.microservice
 
-  name                     = each.value.traffic_data.microservice_environment_name
-  resource_group_name      = local.resource_group_name
-  azure_endpoint_resources = each.value.traffic_data.azure_endpoint_resources
+  name                      = each.value.traffic_data.microservice_environment_name
+  resource_group_name       = local.resource_group_name
+  azure_endpoint_resources  = each.value.traffic_data.azure_endpoint_resources
+  static_endpoint_resources = each.value.traffic_data.static_endpoint_resources
+  custom_domain             = each.value.traffic_data.custom_domain
+  tls_certificate           = each.value.traffic_data.tls_certificate
 
   depends_on = [
     module.microservice,
