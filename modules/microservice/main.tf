@@ -482,7 +482,7 @@ resource "azurerm_app_service" "microservice" {
     #dotnet_framework_version = "v5.0"
     #websockets_enabled = true # Will need for Blazor hosted appservice
     cors {
-      allowed_origins = var.allowed_origins
+      allowed_origins = local.allowed_origins
     }
   }
 
