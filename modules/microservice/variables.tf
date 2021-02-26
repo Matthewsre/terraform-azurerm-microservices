@@ -378,6 +378,12 @@ variable "static_site" {
   default = null
 }
 
+variable "allowed_origins" {
+  description = "Orgins that are allowed to access the application (CORS)"
+  type        = list(string)
+  default     = []
+}
+
 variable "application_identifier_uris" {
   description = "A list of URI(s) that uniquely identify an application within it's Azure AD tenant, or within a verified custom domain if the application is multi-tenant"
   type        = list(string)

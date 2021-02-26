@@ -31,6 +31,7 @@ locals {
   http_target                        = local.has_http ? var.http.target : local.has_appservice ? "appservice" : local.has_function ? "function" : null
   consumers                          = local.has_http ? var.http.consumers != null ? var.http.consumers : [] : []
   has_static_site                    = var.static_site != null
+  allowed_origins                    = var.allowed_origins != null ? var.allowed_origins : [""]
   has_custom_domain                  = var.custom_domain != null && var.custom_domain != ""
   tls_certificate_source             = var.tls_certificate != null ? var.tls_certificate.source != null ? lower(var.tls_certificate.source) : "" : ""
   has_application_permissions        = var.application_permissions != null
@@ -491,6 +492,9 @@ resource "azurerm_app_service" "microservice" {
     min_tls_version = "1.2"
     #dotnet_framework_version = "v5.0"
     #websockets_enabled = true # Will need for Blazor hosted appservice
+    cors {
+      allowed_origins = local.allowed_origins
+    }
   }
 
   app_settings = local.appservice_app_settings
@@ -541,6 +545,10 @@ resource "azurerm_function_app" "microservice" {
     always_on       = var.function == "plan" ? true : false
     ftps_state      = "FtpsOnly"
     min_tls_version = "1.2"
+    cors {
+      allowed_origins     = local.allowed_origins
+      support_credentials = true
+    }
   }
 
   app_settings = merge(local.appservice_app_settings, local.appservice_function_app_settings)
@@ -610,6 +618,9 @@ resource "azurerm_app_service_slot" "microservice" {
     http2_enabled            = each.value.appservice.site_config[0].http2_enabled
     websockets_enabled       = each.value.appservice.site_config[0].websockets_enabled
     always_on                = each.value.appservice.site_config[0].always_on
+    cors {
+      allowed_origins = each.value.appservice.site_config[0].cors.allowed_origins
+    }
   }
 
   depends_on = [
@@ -635,6 +646,9 @@ resource "azurerm_function_app_slot" "microservice" {
     http2_enabled      = azurerm_function_app.microservice[each.value.location].site_config[0].http2_enabled
     websockets_enabled = azurerm_function_app.microservice[each.value.location].site_config[0].websockets_enabled
     always_on          = azurerm_function_app.microservice[each.value.location].site_config[0].always_on
+    cors {
+      allowed_origins = azurerm_function_app.microservice[each.value.location].site_config[0].cors.allowed_origins
+    }
   }
 
   depends_on = [

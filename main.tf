@@ -443,6 +443,7 @@ module "microservice" {
   application_permissions         = each.value.application_permissions
   sql                             = each.value.sql
   roles                           = each.value.roles
+  allowed_origins                 = each.value.allowed_origins
   http                            = each.value.http
   scopes                          = each.value.scopes
   custom_domain                   = each.value.custom_domain
