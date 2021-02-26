@@ -35,6 +35,7 @@ locals {
   tls_certificate_source             = var.tls_certificate != null ? var.tls_certificate.source != null ? lower(var.tls_certificate.source) : "" : ""
   has_application_permissions        = var.application_permissions != null
   application_permissions            = local.has_application_permissions ? var.application_permissions : []
+  application_identifier_uris        = var.application_identifier_uris != null ? var.application_identifier_uris : [lower("api://${local.full_microservice_environment_name}")]
   application_scopes                 = var.scopes != null ? var.scopes : []
 
   graph_resource_app_id         = "00000003-0000-0000-c000-000000000000"
@@ -226,7 +227,7 @@ resource "azuread_application" "microservice" {
   display_name               = local.full_microservice_environment_name
   prevent_duplicate_names    = true
   oauth2_allow_implicit_flow = true
-  identifier_uris            = [lower("api://${local.full_microservice_environment_name}")]
+  identifier_uris            = local.application_identifier_uris
   owners                     = var.application_owners
   group_membership_claims    = "None"
   oauth2_permissions         = []

@@ -182,11 +182,11 @@ variable "custom_domain" {
 
 variable "tls_certificate" {
   description = "Source to retrieve an tls/ssl certificate for the service"
-  type        = object({
-      source        = string
-      secret_id     = optional(string)
-      keyvault_id   = optional(string)
-    })
+  type = object({
+    source      = string
+    secret_id   = optional(string)
+    keyvault_id = optional(string)
+  })
 }
 
 variable "azuread_instance" {
@@ -376,4 +376,10 @@ variable "static_site" {
     storage_tls_version      = string
   })
   default = null
+}
+
+variable "application_identifier_uris" {
+  description = "A list of URI(s) that uniquely identify an application within it's Azure AD tenant, or within a verified custom domain if the application is multi-tenant"
+  type        = list(string)
+  default     = []
 }
