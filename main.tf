@@ -68,7 +68,8 @@ locals {
   azuread_domain                           = data.azuread_domains.default.domains[0].domain_name
   primary_region                           = var.primary_region != "" ? var.primary_region : var.regions[0]
   secondary_region                         = var.secondary_region != "" ? var.secondary_region : length(var.regions) > 1 ? var.regions[1] : null
-  short_regions                            = var.use_region_shortcodes ? [ for region in var.regions: lookup(module.region_to_short_region[0].mapping, region, null) ] : []
+  region_map                               = var.use_region_shortcodes ? module.region_to_short_region[0].mapping : {}
+  short_regions                            = var.use_region_shortcodes ? [ for region in var.regions: local.region_map[region] ] : []
   service_name                             = lower(var.service_name)
   executing_object_id                      = data.azurerm_client_config.current.object_id != null && data.azurerm_client_config.current.object_id != "" ? data.azurerm_client_config.current.object_id : var.executing_object_id
   environment_name                         = local.is_dev ? "${local.environment_differentiator}-${var.environment}" : var.environment
@@ -97,7 +98,6 @@ locals {
 
   owner_group_members = data.azuread_users.owner_groups_users != null ? tolist(data.azuread_users.owner_groups_users.object_ids) : []
   application_owners  = distinct(concat(local.owner_group_members, data.azuread_users.owners.object_ids, [local.executing_object_id]))
-
 
   # 24 characters is used for max storage name
   max_storage_name_length              = 24
@@ -292,9 +292,7 @@ resource "azurerm_key_vault" "service" {
 resource "azurerm_storage_account" "service" {
   for_each = toset(var.regions)
 
-  name                     = format("${local.service_name}%s${local.environment_differentiator_short}${var.environment}", 
-                               var.use_region_shortcodes ? lookup(module.region_to_short_region[0].mapping, each.key, null) : each.key
-                             )
+  name                     = "${local.service_name}${try(local.region_map[each.key], each.key)}${local.environment_differentiator_short}${var.environment}"
   resource_group_name      = local.resource_group_name
   location                 = each.key
   account_tier             = var.storage_account_tier
@@ -306,9 +304,7 @@ resource "azurerm_storage_account" "service" {
 resource "azurerm_servicebus_namespace" "service" {
   for_each = toset(local.servicebus_regions)
 
-  name                = format("${local.service_name}%s${local.environment_name}", 
-                          var.use_region_shortcodes ? lookup(module.region_to_short_region[0].mapping, each.key, null) : each.key
-                        )
+  name                = "${local.service_name}${try(local.region_map[each.key], each.key)}${local.environment_name}"
   resource_group_name = local.resource_group_name
   location            = each.key
   sku                 = var.servicebus_sku
@@ -355,9 +351,7 @@ locals {
 resource "azurerm_mssql_server" "service" {
   for_each = toset(local.sql_server_regions)
 
-  name                         = format("${local.service_name}%s${local.environment_name}", 
-                                   var.use_region_shortcodes ? lookup(module.region_to_short_region[0].mapping, each.key, null) : each.key
-                                 )
+  name                         = "${local.service_name}${try(local.region_map[each.key], each.key)}${local.environment_name}"
   resource_group_name          = local.resource_group_name
   location                     = each.key
   administrator_login          = local.admin_login
@@ -409,9 +403,7 @@ resource "azurerm_mssql_elasticpool" "service" {
 resource "azurerm_app_service_plan" "service" {
   for_each = toset(local.appservice_plan_regions)
 
-  name                = format("${local.service_name}-%s-${local.environment_name}", 
-                          var.use_region_shortcodes ? lookup(module.region_to_short_region[0].mapping, each.key, null) : each.key
-                        )
+  name                = "${local.service_name}-${try(local.region_map[each.key], each.key)}-${local.environment_name}"
   location            = each.key
   resource_group_name = local.resource_group_name
   #per_site_scaling    = true
@@ -425,9 +417,7 @@ resource "azurerm_app_service_plan" "service" {
 resource "azurerm_app_service_plan" "service_consumption" {
   for_each = toset(local.consumption_appservice_plan_regions)
 
-  name                = format("${local.service_name}-dyn-%s-${local.environment_name}", 
-                          var.use_region_shortcodes ? lookup(module.region_to_short_region[0].mapping, each.key, null) : each.key
-                        )
+  name                = "${local.service_name}-dyn-${try(local.region_map[each.key], each.key)}-${local.environment_name}"
   location            = each.key
   resource_group_name = local.resource_group_name
   kind                = "FunctionApp"

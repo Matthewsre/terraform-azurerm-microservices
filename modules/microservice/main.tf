@@ -24,6 +24,7 @@ module "region_to_short_region" {
 locals {
   microservice_environment_name      = "${var.name}-${var.environment_name}"
   full_microservice_environment_name = "${var.service_name}-${local.microservice_environment_name}"
+  region_map                         = var.use_region_shortcodes ? module.region_to_short_region[0].mapping : {}
   has_key_vault                      = true
   has_appservice                     = var.appservice == "plan"
   appservice_plans                   = local.has_appservice ? var.appservice_plans : {}
@@ -475,9 +476,7 @@ resource "azurerm_app_service" "microservice" {
   for_each = local.appservice_plans
 
   resource_group_name = var.resource_group_name
-  name                = format("${var.name}-%s-${var.environment_name}",
-                          var.use_region_shortcodes ? lookup(module.region_to_short_region[0].mapping, each.value.location, null) : each.value.location
-                        )
+  name                = "${var.name}-${try(local.region_map[each.value.location], each.value.location)}-${var.environment_name}"
   location            = each.value.location
   app_service_plan_id = each.value.id
   https_only          = true
@@ -526,9 +525,7 @@ resource "azurerm_function_app" "microservice" {
   for_each = local.function_appservice_plans
 
   resource_group_name        = var.resource_group_name
-  name                       = format("${var.name}-function-%s-${var.environment_name}",
-                                 var.use_region_shortcodes ? lookup(module.region_to_short_region[0].mapping, each.value.location, null) : each.value.location
-                               )
+  name                       = "${var.name}-function-${try(local.region_map[each.value.location], each.value.location)}-${var.environment_name}"
   location                   = each.value.location
   app_service_plan_id        = each.value.id
   https_only                 = true
@@ -571,7 +568,7 @@ resource "azurerm_function_app" "microservice" {
 
 locals {
   function_slots = local.has_function && length(var.appservice_deployment_slots) > 0 ? flatten([for slot in var.appservice_deployment_slots : [for appservice in local.function_appservice_plans : { slot = slot, appservice = appservice }]]) : []
-  function_slots_map = { for slot in local.function_slots : format("${slot.slot}-%s", var.use_region_shortcodes ? lookup(module.region_to_short_region[0].mapping, slot.appservice.location, null) : slot.appservice.location) =>
+  function_slots_map = { for slot in local.function_slots : "${slot.slot}-${try(local.region_map[slot.appservice.location], slot.appservice.location)}" =>
     {
       slot_name         = slot.slot
       function_app_name = azurerm_function_app.microservice[slot.appservice.location].name
