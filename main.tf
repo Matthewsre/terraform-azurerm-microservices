@@ -69,7 +69,6 @@ locals {
   primary_region                           = var.primary_region != "" ? var.primary_region : var.regions[0]
   secondary_region                         = var.secondary_region != "" ? var.secondary_region : length(var.regions) > 1 ? var.regions[1] : null
   region_map                               = var.use_region_shortcodes ? module.region_to_short_region[0].mapping : {}
-  short_regions                            = var.use_region_shortcodes ? [ for region in var.regions: local.region_map[region] ] : []
   service_name                             = lower(var.service_name)
   executing_object_id                      = data.azurerm_client_config.current.object_id != null && data.azurerm_client_config.current.object_id != "" ? data.azurerm_client_config.current.object_id : var.executing_object_id
   environment_name                         = local.is_dev ? "${local.environment_differentiator}-${var.environment}" : var.environment
@@ -101,7 +100,7 @@ locals {
 
   # 24 characters is used for max storage name
   max_storage_name_length              = 24
-  max_short_region_length              = var.use_region_shortcodes ? reverse(sort([for region in local.short_regions : length(region)]))[0] : 0 # bug is preventing max() from working used sort and reverse instead
+  max_short_region_length              = var.use_region_shortcodes ? reverse(sort([for region in var.regions : length(lookup(local.region_map, region, region))]))[0] : 0 # bug is preventing max() from working used sort and reverse instead
   max_long_region_length               = reverse(sort([for region in var.regions : length(region)]))[0] # bug is preventing max() from working used sort and reverse instead
   max_region_length                    = var.use_region_shortcodes ? local.max_short_region_length : local.max_long_region_length
   max_environment_differentiator_short = local.max_storage_name_length - (length(local.service_name) + local.max_region_length + length(var.environment))
@@ -292,7 +291,7 @@ resource "azurerm_key_vault" "service" {
 resource "azurerm_storage_account" "service" {
   for_each = toset(var.regions)
 
-  name                     = "${local.service_name}${try(local.region_map[each.key], each.key)}${local.environment_differentiator_short}${var.environment}"
+  name                     = "${local.service_name}${lookup(local.region_map, each.key, each.key)}${local.environment_differentiator_short}${var.environment}"
   resource_group_name      = local.resource_group_name
   location                 = each.key
   account_tier             = var.storage_account_tier
@@ -304,7 +303,7 @@ resource "azurerm_storage_account" "service" {
 resource "azurerm_servicebus_namespace" "service" {
   for_each = toset(local.servicebus_regions)
 
-  name                = "${local.service_name}${try(local.region_map[each.key], each.key)}${local.environment_name}"
+  name                = "${local.service_name}${lookup(local.region_map, each.key, each.key)}${local.environment_name}"
   resource_group_name = local.resource_group_name
   location            = each.key
   sku                 = var.servicebus_sku
@@ -351,7 +350,7 @@ locals {
 resource "azurerm_mssql_server" "service" {
   for_each = toset(local.sql_server_regions)
 
-  name                         = "${local.service_name}${try(local.region_map[each.key], each.key)}${local.environment_name}"
+  name                         = "${local.service_name}${lookup(local.region_map, each.key, each.key)}${local.environment_name}"
   resource_group_name          = local.resource_group_name
   location                     = each.key
   administrator_login          = local.admin_login
@@ -403,7 +402,7 @@ resource "azurerm_mssql_elasticpool" "service" {
 resource "azurerm_app_service_plan" "service" {
   for_each = toset(local.appservice_plan_regions)
 
-  name                = "${local.service_name}-${try(local.region_map[each.key], each.key)}-${local.environment_name}"
+  name                = "${local.service_name}-${lookup(local.region_map, each.key, each.key)}-${local.environment_name}"
   location            = each.key
   resource_group_name = local.resource_group_name
   #per_site_scaling    = true
@@ -417,7 +416,7 @@ resource "azurerm_app_service_plan" "service" {
 resource "azurerm_app_service_plan" "service_consumption" {
   for_each = toset(local.consumption_appservice_plan_regions)
 
-  name                = "${local.service_name}-dyn-${try(local.region_map[each.key], each.key)}-${local.environment_name}"
+  name                = "${local.service_name}-dyn-${lookup(local.region_map, each.key, each.key)}-${local.environment_name}"
   location            = each.key
   resource_group_name = local.resource_group_name
   kind                = "FunctionApp"
