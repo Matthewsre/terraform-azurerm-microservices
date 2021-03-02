@@ -627,7 +627,7 @@ resource "azurerm_app_service_slot" "microservice" {
     websockets_enabled       = each.value.appservice.site_config[0].websockets_enabled
     always_on                = each.value.appservice.site_config[0].always_on
     cors {
-      allowed_origins = each.value.appservice.site_config[0].cors.allowed_origins
+      allowed_origins = each.value.appservice.site_config[0].cors[0].allowed_origins
     }
   }
 
@@ -655,7 +655,7 @@ resource "azurerm_function_app_slot" "microservice" {
     websockets_enabled = azurerm_function_app.microservice[each.value.location].site_config[0].websockets_enabled
     always_on          = azurerm_function_app.microservice[each.value.location].site_config[0].always_on
     cors {
-      allowed_origins = azurerm_function_app.microservice[each.value.location].site_config[0].cors.allowed_origins
+      allowed_origins = azurerm_function_app.microservice[each.value.location].site_config[0].cors[0].allowed_origins
     }
   }
 
