@@ -71,7 +71,6 @@ $storageAccountRole = "Storage Blob Data Contributor"
 Write-Host "Checking Permissions for '$objectId'"
 #$storageAccountPermission = az role assignment list --assignee $objectId --role $storageAccountRole --scope $scope -o tsv
 $storageAccountPermissionExists = $(az role assignment list --assignee $objectId --role $storageAccountRole --scope $scope -o tsv).Length -ne 0
-Write-Host $storageAccountPermissionExists
 
 if (-not $storageAccountPermissionExists) {
     Write-Host "Creating '$storageAccountRole' role assignment for '$objectId'"
