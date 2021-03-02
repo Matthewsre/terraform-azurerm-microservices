@@ -274,6 +274,11 @@ resource "azuread_application" "microservice" {
   reply_urls = local.application_callback_urls
 }
 
+resource "azuread_service_principal" "microservice" {
+  application_id               = azuread_application.microservice.application_id
+  app_role_assignment_required = false
+}
+
 # Combining the default InternalService role with additional roles
 locals {
   application_roles = concat(["InternalService"], coalesce(var.roles, []))
