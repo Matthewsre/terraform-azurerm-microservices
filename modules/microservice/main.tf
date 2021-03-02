@@ -274,6 +274,26 @@ resource "azuread_application" "microservice" {
   reply_urls = local.application_callback_urls
 }
 
+# Creating service principal for application
+# Currently there is no way to set Owners for the application directly through Terraform:
+# Related Issue: https://github.com/hashicorp/terraform-provider-azuread/issues/199
+
+resource "azuread_service_principal" "microservice" {
+  application_id               = azuread_application.microservice.application_id
+  app_role_assignment_required = false
+}
+
+# Work around for adding owners to service principal
+# https://github.com/hashicorp/terraform-provider-azuread/issues/199#issuecomment-647710067
+resource "null_resource" "azuread_service_principal_owners" {
+  for_each = toset(var.application_owners)
+
+  provisioner "local-exec" {
+    command = "az rest -m POST -u https://graph.microsoft.com/beta/servicePrincipals/${azuread_service_principal.microservice.id}/owners/\\$ref -b \"{\\\"@odata.id\\\": \\\"https://graph.microsoft.com/beta/directoryObjects/${each.key}\\\"}\""
+    on_failure = continue // Ignore already exists errors
+  }
+}
+
 # Combining the default InternalService role with additional roles
 locals {
   application_roles = concat(["InternalService"], coalesce(var.roles, []))
