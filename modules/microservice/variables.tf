@@ -108,6 +108,12 @@ variable "roles" {
   default     = []
 }
 
+variable "additional_reply_urls" {
+  description = "Additional reply urls to be added"
+  type        = list(string)
+  default     = []
+}
+
 variable "callback_path" {
   description = "Callback path for authorization"
   type        = string

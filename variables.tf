@@ -89,6 +89,12 @@ variable "service_name" {
   type        = string
 }
 
+variable "dev_service_reply_urls" {
+  description = "Additional callback paths for authorization to be added for dev environment"
+  type        = map(list(string))
+  default = {}
+}
+
 variable "callback_path" {
   description = "Callback path for authorization"
   type        = string
@@ -99,7 +105,6 @@ variable "signed_out_callback_path" {
   type        = string
   default     = "/signout-callback-oidc"
 }
-
 
 # opened bug for lists with optional values https://github.com/hashicorp/terraform/issues/27374
 # this impacts cosmos_containers.max_throughput
@@ -177,7 +182,7 @@ variable "regions" {
 variable "use_region_shortcodes" {
   description = "Use the shortened version of a region name in naming of resources."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "azuread_instance" {
