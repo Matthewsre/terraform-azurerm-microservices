@@ -16,7 +16,6 @@ module "region_to_short_region" {
   source = "./modules/region-to-short-region"
 }
 
-
 #########################
 #### Locals and Data ####
 #########################
@@ -73,11 +72,12 @@ locals {
   function_callback_urls       = [for item in local.function_appservice_plans : lower("https://${var.name}-function-${item.location}-${var.environment_name}${local.functions_baseurl}${var.callback_path}")]
   trafficmanager_callback_urls = [lower("${local.microservice_trafficmanager_url}/"), lower("${local.microservice_trafficmanager_url}${var.callback_path}")]
   frontdoor_callback_urls      = [lower("${local.microservice_frontdoor_url}/"), lower("${local.microservice_frontdoor_url}${var.callback_path}")]
+  additional_callback_urls     = [for item in var.additional_reply_urls : lower("${item}${var.callback_path}")]
 
   custom_domain_callback_urls = local.has_custom_domain ? ["https://${var.custom_domain}${var.callback_path}"] : []
 
 
-  application_callback_urls = concat(tolist(local.trafficmanager_callback_urls), tolist(local.appservice_callback_urls), tolist(local.function_callback_urls), tolist(local.frontdoor_callback_urls), local.custom_domain_callback_urls)
+  application_callback_urls = concat(tolist(local.trafficmanager_callback_urls), tolist(local.appservice_callback_urls), tolist(local.function_callback_urls), tolist(local.frontdoor_callback_urls), tolist(local.additional_callback_urls), local.custom_domain_callback_urls)
 
   # 24 characters is used for max key vault and storage account names
   max_name_length = 24
