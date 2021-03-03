@@ -239,7 +239,19 @@ resource "azuread_application" "microservice" {
   identifier_uris            = local.application_identifier_uris
   owners                     = var.application_owners
   group_membership_claims    = "None"
-  oauth2_permissions         = []
+
+  dynamic "oauth2_permissions" {
+     for_each = { for item in local.application_scopes : item.id => item }
+     content{
+        admin_consent_description  = oauth2_permissions.value.description != null && oauth2_permissions.value.description != "" ? oauth2_permissions.value.description : "Allow the application to access ${local.full_microservice_environment_name} with ${oauth2_permissions.value.id} permission"
+        admin_consent_display_name = oauth2_permissions.value.name != null && oauth2_permissions.value.name != "" ? oauth2_permissions.value.name : "Access ${local.full_microservice_environment_name} with ${oauth2_permissions.value.id} permission"
+        user_consent_description   = oauth2_permissions.value.description != null && oauth2_permissions.value.description != "" ? oauth2_permissions.value.description : "Allow the application to access ${local.full_microservice_environment_name} with ${oauth2_permissions.value.id} permission"
+        user_consent_display_name  = oauth2_permissions.value.name != null && oauth2_permissions.value.name != "" ? oauth2_permissions.value.name : "Access ${local.full_microservice_environment_name} with ${oauth2_permissions.value.id} permission"
+        is_enabled                 = true
+        type                       = oauth2_permissions.value.type != null && oauth2_permissions.value.type != "" ? oauth2_permissions.value.type : "Admin"
+        value                      = oauth2_permissions.value.id
+     }
+  }
 
   # Granting required permissions to Microsoft Graph for auth to work
   # Post used to find the correct "magic" Guids
@@ -308,19 +320,6 @@ resource "azuread_application_app_role" "microservice" {
   display_name          = each.value
   is_enabled            = true
   value                 = each.value
-}
-
-resource "azuread_application_oauth2_permission" "microservice" {
-  for_each = { for item in local.application_scopes : item.id => item }
-
-  application_object_id      = azuread_application.microservice.id
-  admin_consent_description  = each.value.description != null && each.value.description != "" ? each.value.description : "Allow the application to access ${azuread_application.microservice.display_name} with ${each.value.id} permission"
-  admin_consent_display_name = each.value.name != null && each.value.name != "" ? each.value.name : "Access ${azuread_application.microservice.display_name} with ${each.value.id} permission"
-  user_consent_description   = each.value.description != null && each.value.description != "" ? each.value.description : "Allow the application to access ${azuread_application.microservice.display_name} with ${each.value.id} permission"
-  user_consent_display_name  = each.value.name != null && each.value.name != "" ? each.value.name : "Access ${azuread_application.microservice.display_name} with ${each.value.id} permission"
-  is_enabled                 = true
-  type                       = each.value.type != null && each.value.type != "" ? each.value.type : "Admin"
-  value                      = each.value.id
 }
 
 ### SQL Database
