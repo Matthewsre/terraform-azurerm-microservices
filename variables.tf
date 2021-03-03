@@ -182,7 +182,7 @@ variable "regions" {
 variable "use_region_shortcodes" {
   description = "Use the shortened version of a region name in naming of resources."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "azuread_instance" {
