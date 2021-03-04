@@ -310,7 +310,7 @@ resource "null_resource" "azuread_service_principal_owners" {
   for_each = toset(var.application_owners)
 
   provisioner "local-exec" {
-    command    = "az rest -m POST -u '${graph_url}/v1.0/servicePrincipals/${azuread_service_principal.microservice.id}/owners/$ref' -b \"{'@odata.id': '${graph_url}/v1.0/directoryObjects/${each.key}'}\""
+    command    = "az rest -m POST -u '${local.graph_url}/v1.0/servicePrincipals/${azuread_service_principal.microservice.id}/owners/$ref' -b \"{'@odata.id': '${local.graph_url}/v1.0/directoryObjects/${each.key}'}\""
     on_failure = continue // Ignore already exists errors
   }
 }
