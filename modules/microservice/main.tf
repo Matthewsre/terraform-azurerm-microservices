@@ -46,6 +46,15 @@ locals {
   application_identifier_uris        = var.application_identifier_uris != null ? var.application_identifier_uris : [lower("api://${local.full_microservice_environment_name}")]
   application_scopes                 = var.scopes != null ? var.scopes : []
 
+  # graph url to support national clouds listed here
+  # https://docs.microsoft.com/en-us/graph/deployments#microsoft-graph-and-graph-explorer-service-root-endpoints
+  graph_url_lookup = {
+    "usgovernment" = "https://graph.microsoft.us"
+    "german"       = "https://graph.microsoft.de"
+    "china"        = "https://microsoftgraph.chinacloudapi.cn"
+  }
+  graph_url = lookup(local.graph_url_lookup, var.azure_environment, "https://graph.microsoft.com")
+
   graph_resource_app_id         = "00000003-0000-0000-c000-000000000000"
   graph_application_permissions = local.has_application_permissions ? [for item in local.application_permissions : item if item.resource_app_id == local.graph_resource_app_id] : []
   other_application_permissions = local.has_application_permissions ? [for item in local.application_permissions : item if item.resource_app_id != local.graph_resource_app_id] : []
@@ -241,16 +250,16 @@ resource "azuread_application" "microservice" {
   group_membership_claims    = "None"
 
   dynamic "oauth2_permissions" {
-     for_each = { for item in local.application_scopes : item.id => item }
-     content{
-        admin_consent_description  = oauth2_permissions.value.description != null && oauth2_permissions.value.description != "" ? oauth2_permissions.value.description : "Allow the application to access ${local.full_microservice_environment_name} with ${oauth2_permissions.value.id} permission"
-        admin_consent_display_name = oauth2_permissions.value.name != null && oauth2_permissions.value.name != "" ? oauth2_permissions.value.name : "Access ${local.full_microservice_environment_name} with ${oauth2_permissions.value.id} permission"
-        user_consent_description   = oauth2_permissions.value.description != null && oauth2_permissions.value.description != "" ? oauth2_permissions.value.description : "Allow the application to access ${local.full_microservice_environment_name} with ${oauth2_permissions.value.id} permission"
-        user_consent_display_name  = oauth2_permissions.value.name != null && oauth2_permissions.value.name != "" ? oauth2_permissions.value.name : "Access ${local.full_microservice_environment_name} with ${oauth2_permissions.value.id} permission"
-        is_enabled                 = true
-        type                       = oauth2_permissions.value.type != null && oauth2_permissions.value.type != "" ? oauth2_permissions.value.type : "Admin"
-        value                      = oauth2_permissions.value.id
-     }
+    for_each = { for item in local.application_scopes : item.id => item }
+    content {
+      admin_consent_description  = oauth2_permissions.value.description != null && oauth2_permissions.value.description != "" ? oauth2_permissions.value.description : "Allow the application to access ${local.full_microservice_environment_name} with ${oauth2_permissions.value.id} permission"
+      admin_consent_display_name = oauth2_permissions.value.name != null && oauth2_permissions.value.name != "" ? oauth2_permissions.value.name : "Access ${local.full_microservice_environment_name} with ${oauth2_permissions.value.id} permission"
+      user_consent_description   = oauth2_permissions.value.description != null && oauth2_permissions.value.description != "" ? oauth2_permissions.value.description : "Allow the application to access ${local.full_microservice_environment_name} with ${oauth2_permissions.value.id} permission"
+      user_consent_display_name  = oauth2_permissions.value.name != null && oauth2_permissions.value.name != "" ? oauth2_permissions.value.name : "Access ${local.full_microservice_environment_name} with ${oauth2_permissions.value.id} permission"
+      is_enabled                 = true
+      type                       = oauth2_permissions.value.type != null && oauth2_permissions.value.type != "" ? oauth2_permissions.value.type : "Admin"
+      value                      = oauth2_permissions.value.id
+    }
   }
 
   # Granting required permissions to Microsoft Graph for auth to work
@@ -301,7 +310,7 @@ resource "null_resource" "azuread_service_principal_owners" {
   for_each = toset(var.application_owners)
 
   provisioner "local-exec" {
-    command = "az rest -m POST -u https://graph.microsoft.com/beta/servicePrincipals/${azuread_service_principal.microservice.id}/owners/\\$ref -b \"{\\\"@odata.id\\\": \\\"https://graph.microsoft.com/beta/directoryObjects/${each.key}\\\"}\""
+    command    = "az rest -m POST -u '${graph_url}/v1.0/servicePrincipals/${azuread_service_principal.microservice.id}/owners/$ref' -b \"{'@odata.id': '${graph_url}/v1.0/directoryObjects/${each.key}'}\""
     on_failure = continue // Ignore already exists errors
   }
 }

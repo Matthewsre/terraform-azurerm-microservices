@@ -442,6 +442,7 @@ module "microservice" {
   azure_environment               = var.azure_environment
   environment                     = var.environment
   environment_differentiator      = local.environment_differentiator
+  azure_environment               = var.azure_environment
   create_appsettings              = var.create_appsettings
   appsettings_path                = var.appsettings_path
   appservice                      = each.value.appservice
