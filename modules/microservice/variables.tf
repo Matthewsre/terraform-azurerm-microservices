@@ -85,17 +85,6 @@ variable "environment" {
   }
 }
 
-variable "azure_environment" {
-  description = "Type of Azure Environment being deployed to"
-  type        = string
-  default     = "public"
-  validation {
-    condition     = contains(["public", "china", "german", "stack", "usgovernment"], lower(var.azure_environment))
-    error_message = "Environment must be a valid Azure Environment."
-    # See https://www.terraform.io/docs/language/settings/backends/azurerm.html#environment for more info
-  }
-}
-
 variable "create_appsettings" {
   description = "Enable this to write appsettings json files. This is useful for a dev environment where hosting will be done locally."
   type        = bool
