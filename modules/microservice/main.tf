@@ -68,8 +68,8 @@ locals {
   frontdoor_name             = local.full_microservice_environment_name
   microservice_frontdoor_url = lower("https://${local.frontdoor_name}${local.frontdoor_baseurl}")
 
-  appservice_callback_urls     = [for item in local.appservice_plans : lower("https://${var.name}-${item.location}-${var.environment_name}${local.appservices_baseurl}${var.callback_path}")]
-  function_callback_urls       = [for item in local.function_appservice_plans : lower("https://${var.name}-function-${item.location}-${var.environment_name}${local.functions_baseurl}${var.callback_path}")]
+  appservice_callback_urls     = [for item in local.appservice_plans : lower("https://${var.name}-${lookup(local.region_map, item.location, item.location)}-${var.environment_name}${local.appservices_baseurl}${var.callback_path}")]
+  function_callback_urls       = [for item in local.function_appservice_plans : lower("https://${var.name}-function-${lookup(local.region_map, item.location, item.location)}-${var.environment_name}${local.functions_baseurl}${var.callback_path}")]
   trafficmanager_callback_urls = [lower("${local.microservice_trafficmanager_url}/"), lower("${local.microservice_trafficmanager_url}${var.callback_path}")]
   frontdoor_callback_urls      = [lower("${local.microservice_frontdoor_url}/"), lower("${local.microservice_frontdoor_url}${var.callback_path}")]
   additional_callback_urls     = [for item in var.additional_reply_urls : lower("${item}${var.callback_path}")]
@@ -538,10 +538,10 @@ resource "azurerm_app_service" "microservice" {
       enabled = true
       active_directory {
         client_id = azuread_application.microservice.application_id
-        allowed_audiences = [
-          "https://${var.name}-${each.value.location}-${var.environment_name}${local.appservices_baseurl}",
+        allowed_audiences = distinct(concat([
+          "https://${var.name}-${lookup(local.region_map, each.value.location, each.value.location)}-${var.environment_name}${local.appservices_baseurl}",
           local.microservice_trafficmanager_url
-        ]
+        ],local.application_identifier_uris))
       }
       default_provider = "AzureActiveDirectory"
       issuer           = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
@@ -592,10 +592,10 @@ resource "azurerm_function_app" "microservice" {
       enabled = true
       active_directory {
         client_id = azuread_application.microservice.application_id
-        allowed_audiences = [
-          "https://${var.name}-function-${each.value.location}-${var.environment_name}${local.functions_baseurl}",
+        allowed_audiences = distinct(concat([
+          "https://${var.name}-function-${lookup(local.region_map, each.value.location, each.value.location)}-${var.environment_name}${local.functions_baseurl}",
           local.microservice_trafficmanager_url
-        ]
+        ],local.application_identifier_uris))
       }
       default_provider = "AzureActiveDirectory"
       issuer           = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
