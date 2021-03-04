@@ -101,7 +101,7 @@ locals {
   # 24 characters is used for max storage name
   max_storage_name_length              = 24
   max_short_region_length              = var.use_region_shortcodes ? reverse(sort([for region in var.regions : length(lookup(local.region_map, region, region))]))[0] : 0 # bug is preventing max() from working used sort and reverse instead
-  max_long_region_length               = reverse(sort([for region in var.regions : length(region)]))[0] # bug is preventing max() from working used sort and reverse instead
+  max_long_region_length               = reverse(sort([for region in var.regions : length(region)]))[0]                                                                   # bug is preventing max() from working used sort and reverse instead
   max_region_length                    = var.use_region_shortcodes ? local.max_short_region_length : local.max_long_region_length
   max_environment_differentiator_short = local.max_storage_name_length - (length(local.service_name) + local.max_region_length + length(var.environment))
   environment_differentiator_short     = local.max_environment_differentiator_short > 0 ? length(local.environment_differentiator) <= local.max_environment_differentiator_short ? local.environment_differentiator : substr(local.environment_differentiator, 0, local.max_environment_differentiator_short) : ""
@@ -442,13 +442,12 @@ module "microservice" {
   azure_environment               = var.azure_environment
   environment                     = var.environment
   environment_differentiator      = local.environment_differentiator
-  azure_environment               = var.azure_environment
   create_appsettings              = var.create_appsettings
   appsettings_path                = var.appsettings_path
   appservice                      = each.value.appservice
   function                        = each.value.function
   require_auth                    = each.value.require_auth == null ? false : each.value.require_auth
-  additional_reply_urls           = local.is_dev ? lookup(var.dev_service_reply_urls, each.value.name,[]) : []
+  additional_reply_urls           = local.is_dev ? lookup(var.dev_service_reply_urls, each.value.name, []) : []
   application_identifier_uris     = each.value.application_identifier_uris
   application_owners              = local.application_owners
   application_permissions         = each.value.application_permissions
