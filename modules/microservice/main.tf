@@ -70,6 +70,7 @@ locals {
   appservices_baseurl    = var.azure_environment == "usgovernment" ? ".azurewebsites.us" : ".azurewebsites.net"
   trafficmanager_baseurl = var.azure_environment == "usgovernment" ? ".usgovtrafficmanager.net" : ".trafficmanager.net"
   frontdoor_baseurl      = var.azure_environment == "usgovernment" ? ".azurefd.us" : ".azurefd.net"
+  staticsite_baseurl     = var.azure_environment == "usgovernment" ? ".z5.web.core.usgovcloudapi.net" : ".z5.web.core.windows.net"
 
   trafficmanager_name             = local.full_microservice_environment_name
   microservice_trafficmanager_url = lower("https://${local.trafficmanager_name}${local.trafficmanager_baseurl}")
@@ -757,7 +758,7 @@ locals {
   function_app_endpoint_resources = local.http_target == "function" ? { for function in azurerm_function_app.microservice : function.location => { id = function.id, location = function.location } } : {}
   azure_endpoint_resources        = merge(local.app_service_endpoint_resources, local.function_app_endpoint_resources)
 
-  static_endpoint_primary_resources   = local.has_static_site ? { for site in azurerm_storage_account.microservice : site.primary_web_host => { id = site.id, host = site.primary_web_host } if site.static_website != null } : {}
-  static_endpoint_secondary_resources = local.has_static_site ? { for site in azurerm_storage_account.microservice : site.secondary_web_host => { id = site.id, host = site.secondary_web_host } if site.static_website != null } : {}
+  static_endpoint_primary_resources   = { for site in azurerm_storage_account.microservice : "${site.name}-primary" => { id = "${site.name}-primary", host = "${site.name}${local.staticsite_baseurl}" }} 
+  static_endpoint_secondary_resources = { for site in azurerm_storage_account.microservice : "${site.name}-secondary" => { id = "${site.name}-secondary", host = "${site.name}-secondary${local.staticsite_baseurl}" } } 
   static_endpoint_resources           = merge(local.static_endpoint_primary_resources, local.static_endpoint_secondary_resources)
 }
