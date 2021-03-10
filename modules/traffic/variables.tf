@@ -18,10 +18,7 @@ variable "azure_endpoint_resources" {
 
 variable "static_endpoint_resources" {
   description = "Endpoint resources to be included in front door"
-  type = map(object({
-    id   = string
-    host = string
-  }))
+  type = map(string)
 }
 
 variable "custom_domain" {

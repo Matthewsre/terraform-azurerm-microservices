@@ -84,8 +84,8 @@ resource "azurerm_frontdoor" "microservice" {
     dynamic "backend" {
       for_each = local.frontdoor_hosts
       content {
-        host_header = backend.value.host
-        address     = backend.value.host
+        host_header = backend.value
+        address     = backend.value
         http_port   = 80
         https_port  = 443
       }
