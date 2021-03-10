@@ -757,7 +757,7 @@ locals {
   function_app_endpoint_resources = local.http_target == "function" ? { for function in azurerm_function_app.microservice : function.location => { id = function.id, location = function.location } } : {}
   azure_endpoint_resources        = merge(local.app_service_endpoint_resources, local.function_app_endpoint_resources)
 
-  static_endpoint_primary_resources   = local.has_static_site ? { for site in azurerm_storage_account.microservice : site.primary_web_host => { id = site.id, host = site.primary_web_host } if site.static_website != null } : {}
-  static_endpoint_secondary_resources = local.has_static_site ? { for site in azurerm_storage_account.microservice : site.secondary_web_host => { id = site.id, host = site.secondary_web_host } if site.static_website != null } : {}
+  static_endpoint_primary_resources   = { for site in azurerm_storage_account.microservice : "${site.name}-primary" => site.primary_web_host } 
+  static_endpoint_secondary_resources = { for site in azurerm_storage_account.microservice : "${site.name}-secondary" => site.secondary_web_host } 
   static_endpoint_resources           = merge(local.static_endpoint_primary_resources, local.static_endpoint_secondary_resources)
 }
