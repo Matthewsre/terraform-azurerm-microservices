@@ -24,6 +24,12 @@ provider "azurerm" {
 
 provider "random" {}
 
+module "region_to_short_region" {
+  count = var.use_region_shortcodes ? 1 : 0
+
+  source = "./modules/region-to-short-region"
+}
+
 #########################
 #### Locals and Data ####
 #########################
@@ -45,16 +51,16 @@ data "azuread_domains" "default" {
 
 data "azuread_users" "owners" {
   user_principal_names = var.application_owner_user_principal_names
-  ignore_missing = true
+  ignore_missing       = true
 }
 
 data "azuread_group" "owner_groups" {
-  for_each = zipmap(var.application_owner_group_object_ids,var.application_owner_group_object_ids)
+  for_each  = zipmap(var.application_owner_group_object_ids, var.application_owner_group_object_ids)
   object_id = each.value
 }
 
 data "azuread_users" "owner_groups_users" {
-  object_ids = flatten([for item in data.azuread_group.owner_groups: item.members])
+  object_ids     = flatten([for item in data.azuread_group.owner_groups : item.members])
   ignore_missing = true
 }
 
@@ -62,7 +68,9 @@ locals {
   azuread_domain                           = data.azuread_domains.default.domains[0].domain_name
   primary_region                           = var.primary_region != "" ? var.primary_region : var.regions[0]
   secondary_region                         = var.secondary_region != "" ? var.secondary_region : length(var.regions) > 1 ? var.regions[1] : null
+  region_map                               = var.use_region_shortcodes ? module.region_to_short_region[0].mapping : {}
   service_name                             = lower(var.service_name)
+  executing_object_id                      = data.azurerm_client_config.current.object_id != null && data.azurerm_client_config.current.object_id != "" ? data.azurerm_client_config.current.object_id : var.executing_object_id
   environment_name                         = local.is_dev ? "${local.environment_differentiator}-${var.environment}" : var.environment
   service_environment_name                 = local.is_dev ? "${var.service_name}-${local.environment_differentiator}-${var.environment}" : "${var.service_name}-${var.environment}"
   environment_differentiator               = var.environment_differentiator != "" ? var.environment_differentiator : local.is_dev && length(data.azuread_user.current_user) > 0 ? replace(split(".", split("_", split("#EXT#", data.azuread_user.current_user[0].mail_nickname)[0])[0])[0], "-", "") : ""
@@ -85,14 +93,16 @@ locals {
   include_ip_address = var.key_vault_include_ip_address == null ? local.is_dev : var.key_vault_include_ip_address == true
   lookup_ip_address  = local.include_ip_address && var.ip_address == ""
 
-  azure_easyauth_callback                 = "/.auth/login/aad/callback"
+  azure_easyauth_callback = "/.auth/login/aad/callback"
 
-  owner_group_members                     = data.azuread_users.owner_groups_users!= null ? tolist(data.azuread_users.owner_groups_users.object_ids):[]
-  application_owners                      = distinct(concat(local.owner_group_members, data.azuread_users.owners.object_ids,[data.azurerm_client_config.current.object_id]))
+  owner_group_members = data.azuread_users.owner_groups_users != null ? tolist(data.azuread_users.owner_groups_users.object_ids) : []
+  application_owners  = distinct(concat(local.owner_group_members, data.azuread_users.owners.object_ids, [local.executing_object_id]))
 
   # 24 characters is used for max storage name
   max_storage_name_length              = 24
-  max_region_length                    = reverse(sort([for region in var.regions : length(region)]))[0] # bug is preventing max() from working used sort and reverse instead
+  max_short_region_length              = var.use_region_shortcodes ? reverse(sort([for region in var.regions : length(lookup(local.region_map, region, region))]))[0] : 0 # bug is preventing max() from working used sort and reverse instead
+  max_long_region_length               = reverse(sort([for region in var.regions : length(region)]))[0]                                                                   # bug is preventing max() from working used sort and reverse instead
+  max_region_length                    = var.use_region_shortcodes ? local.max_short_region_length : local.max_long_region_length
   max_environment_differentiator_short = local.max_storage_name_length - (length(local.service_name) + local.max_region_length + length(var.environment))
   environment_differentiator_short     = local.max_environment_differentiator_short > 0 ? length(local.environment_differentiator) <= local.max_environment_differentiator_short ? local.environment_differentiator : substr(local.environment_differentiator, 0, local.max_environment_differentiator_short) : ""
 
@@ -254,7 +264,7 @@ resource "azurerm_key_vault" "service" {
 
   access_policy {
     tenant_id = data.azurerm_client_config.current.tenant_id
-    object_id = data.azurerm_client_config.current.object_id
+    object_id = local.executing_object_id
 
     certificate_permissions = var.key_vault_permissions.certificate_permissions
     key_permissions         = var.key_vault_permissions.key_permissions
@@ -281,7 +291,7 @@ resource "azurerm_key_vault" "service" {
 resource "azurerm_storage_account" "service" {
   for_each = toset(var.regions)
 
-  name                     = "${local.service_name}${each.key}${local.environment_differentiator_short}${var.environment}"
+  name                     = "${local.service_name}${lookup(local.region_map, each.key, each.key)}${local.environment_differentiator_short}${var.environment}"
   resource_group_name      = local.resource_group_name
   location                 = each.key
   account_tier             = var.storage_account_tier
@@ -293,7 +303,7 @@ resource "azurerm_storage_account" "service" {
 resource "azurerm_servicebus_namespace" "service" {
   for_each = toset(local.servicebus_regions)
 
-  name                = "${local.service_name}${each.key}${local.environment_name}"
+  name                = "${local.service_name}${lookup(local.region_map, each.key, each.key)}${local.environment_name}"
   resource_group_name = local.resource_group_name
   location            = each.key
   sku                 = var.servicebus_sku
@@ -340,7 +350,7 @@ locals {
 resource "azurerm_mssql_server" "service" {
   for_each = toset(local.sql_server_regions)
 
-  name                         = "${local.service_name}${each.key}${local.environment_name}"
+  name                         = "${local.service_name}${lookup(local.region_map, each.key, each.key)}${local.environment_name}"
   resource_group_name          = local.resource_group_name
   location                     = each.key
   administrator_login          = local.admin_login
@@ -392,7 +402,7 @@ resource "azurerm_mssql_elasticpool" "service" {
 resource "azurerm_app_service_plan" "service" {
   for_each = toset(local.appservice_plan_regions)
 
-  name                = "${local.service_name}-${each.key}-${local.environment_name}"
+  name                = "${local.service_name}-${lookup(local.region_map, each.key, each.key)}-${local.environment_name}"
   location            = each.key
   resource_group_name = local.resource_group_name
   #per_site_scaling    = true
@@ -406,7 +416,7 @@ resource "azurerm_app_service_plan" "service" {
 resource "azurerm_app_service_plan" "service_consumption" {
   for_each = toset(local.consumption_appservice_plan_regions)
 
-  name                = "${local.service_name}-dyn-${each.key}-${local.environment_name}"
+  name                = "${local.service_name}-dyn-${lookup(local.region_map, each.key, each.key)}-${local.environment_name}"
   location            = each.key
   resource_group_name = local.resource_group_name
   kind                = "FunctionApp"
@@ -437,17 +447,24 @@ module "microservice" {
   appservice                      = each.value.appservice
   function                        = each.value.function
   require_auth                    = each.value.require_auth == null ? false : each.value.require_auth
+  additional_reply_urls           = local.is_dev ? lookup(var.dev_service_reply_urls, each.value.name, []) : []
+  application_identifier_uris     = each.value.application_identifier_uris
   application_owners              = local.application_owners
   application_permissions         = each.value.application_permissions
   sql                             = each.value.sql
   roles                           = each.value.roles
+  allowed_origins                 = each.value.allowed_origins
   http                            = each.value.http
+  scopes                          = each.value.scopes
+  custom_domain                   = each.value.custom_domain
+  tls_certificate                 = each.value.tls_certificate
   cosmos_containers               = each.value.cosmos_containers == null ? [] : each.value.cosmos_containers
   queues                          = each.value.queues == null ? [] : each.value.queues
   resource_group_name             = local.resource_group_name
   retention_in_days               = var.retention_in_days
   primary_region                  = local.primary_region
   secondary_region                = local.secondary_region
+  use_region_shortcodes           = var.use_region_shortcodes
   environment_name                = local.environment_name
   callback_path                   = each.value.function != null ? local.azure_easyauth_callback : var.callback_path
   signed_out_callback_path        = var.signed_out_callback_path
@@ -455,6 +472,7 @@ module "microservice" {
   key_vault_permissions           = var.key_vault_permissions
   key_vault_network_acls          = local.key_vault_network_acls
   azurerm_client_config           = data.azurerm_client_config.current
+  executing_object_id             = local.executing_object_id
   application_insights            = azurerm_application_insights.service
   storage_accounts                = azurerm_storage_account.service
   sql_servers                     = local.has_sql_server ? azurerm_mssql_server.service : null
@@ -470,15 +488,14 @@ module "microservice" {
   appservice_plans                = azurerm_app_service_plan.service
   appservice_deployment_slots     = var.appservice_deployment_slots
   consumption_appservice_plans    = azurerm_app_service_plan.service_consumption
-  static_site                     = each.value.static_site != null ? {
-                                        index_document              = each.value.static_site.index_document
-                                        error_document              = each.value.static_site.error_document
-                                        domain                      = each.value.static_site.domain
-                                        storage_kind                = var.static_site_kind
-                                        storage_tier                = var.static_site_tier
-                                        storage_replication_type    = var.static_site_replication_type
-                                        storage_tls_version         = var.static_site_tls_version
-                                      }: null
+  static_site = each.value.static_site != null ? {
+    index_document           = each.value.static_site.index_document
+    error_document           = each.value.static_site.error_document
+    storage_kind             = var.static_site_kind
+    storage_tier             = var.static_site_tier
+    storage_replication_type = var.static_site_replication_type
+    storage_tls_version      = var.static_site_tls_version
+  } : null
 
   depends_on = [
     azurerm_storage_account.service,
@@ -504,9 +521,12 @@ module "microservice_traffic" {
   source   = "./modules/traffic"
   for_each = var.exclude_hosts ? {} : module.microservice
 
-  name                     = each.value.traffic_data.microservice_environment_name
-  resource_group_name      = local.resource_group_name
-  azure_endpoint_resources = each.value.traffic_data.azure_endpoint_resources
+  name                      = each.value.traffic_data.microservice_environment_name
+  resource_group_name       = local.resource_group_name
+  azure_endpoint_resources  = each.value.traffic_data.azure_endpoint_resources
+  static_endpoint_resources = each.value.traffic_data.static_endpoint_resources
+  custom_domain             = each.value.traffic_data.custom_domain
+  tls_certificate           = each.value.traffic_data.tls_certificate
 
   depends_on = [
     module.microservice,

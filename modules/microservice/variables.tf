@@ -4,6 +4,12 @@ variable "use_msi_to_authenticate" {
   default     = false
 }
 
+variable "executing_object_id" {
+  description = "Object Id of user, service principal, MSI, etc. that is being used to execute this module. Needed for setting permissions such as KeyVault."
+  type        = string
+  default     = ""
+}
+
 variable "resource_group_name" {
   description = "Name of the resource group"
   type        = string
@@ -35,6 +41,12 @@ variable "secondary_region" {
   type        = string
 }
 
+variable "use_region_shortcodes" {
+  description = "Use the shortened version of a region name in naming of resources."
+  type        = bool
+  default     = false
+}
+
 variable "retention_in_days" {
   description = "Days set for retention policies"
   type        = number
@@ -52,15 +64,15 @@ variable "application_owners" {
   default     = []
 }
 
-variable "application_permissions"{
+variable "application_permissions" {
   description = "Additional permissions to be added to the application"
   type = list(object({
-      resource_app_id = string
-      resource_access = list(object({
-        id   = string
-        type = string
+    resource_app_id = string
+    resource_access = list(object({
+      id   = string
+      type = string
       })
-    )}))
+  ) }))
   default = []
 }
 
@@ -92,6 +104,12 @@ variable "environment_name" {
 
 variable "roles" {
   description = "Roles to provision for the AAD application"
+  type        = list(string)
+  default     = []
+}
+
+variable "additional_reply_urls" {
+  description = "Additional reply urls to be added"
   type        = list(string)
   default     = []
 }
@@ -148,6 +166,17 @@ variable "sql" {
   }
 }
 
+variable "scopes" {
+  description = "Scopes to define on the application"
+  type = list(object({
+    id          = string
+    type        = optional(string)
+    name        = optional(string)
+    description = optional(string)
+  }))
+  default = []
+}
+
 variable "http" {
   description = "Target option for http traffic manager configuration and optional consumers to request role"
   type = object({
@@ -155,6 +184,21 @@ variable "http" {
     consumers = optional(list(string))
   })
   default = null
+}
+
+variable "custom_domain" {
+  description = "Custom domain name to use for exposing the service"
+  type        = string
+  default     = ""
+}
+
+variable "tls_certificate" {
+  description = "Source to retrieve an tls/ssl certificate for the service"
+  type = object({
+    source      = string
+    secret_id   = optional(string)
+    keyvault_id = optional(string)
+  })
 }
 
 variable "azuread_instance" {
@@ -333,16 +377,27 @@ variable "key_vault_network_acls" {
   default = null
 }
 
-variable "static_site" { 
+variable "static_site" {
   description = "Defines the static site settings"
   type = object({
-      index_document                = string
-      error_document                = string
-      domain                        = string
-      storage_kind                  = string
-      storage_tier                  = string
-      storage_replication_type      = string
-      storage_tls_version           = string
-    })
+    index_document           = string
+    error_document           = string
+    storage_kind             = string
+    storage_tier             = string
+    storage_replication_type = string
+    storage_tls_version      = string
+  })
   default = null
+}
+
+variable "allowed_origins" {
+  description = "Orgins that are allowed to access the application (CORS)"
+  type        = list(string)
+  default     = []
+}
+
+variable "application_identifier_uris" {
+  description = "A list of URI(s) that uniquely identify an application within it's Azure AD tenant, or within a verified custom domain if the application is multi-tenant"
+  type        = list(string)
+  default     = []
 }

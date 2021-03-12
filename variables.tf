@@ -4,6 +4,12 @@ variable "use_msi_to_authenticate" {
   default     = false
 }
 
+variable "executing_object_id" {
+  description = "Object Id of user, service principal, MSI, etc. that is being used to execute this module. Needed for setting permissions such as KeyVault."
+  type        = string
+  default     = ""
+}
+
 variable "azure_environment" {
   description = "Type of Azure Environment being deployed to"
   type        = string
@@ -83,6 +89,12 @@ variable "service_name" {
   type        = string
 }
 
+variable "dev_service_reply_urls" {
+  description = "Additional callback paths for authorization to be added for dev environment"
+  type        = map(list(string))
+  default = {}
+}
+
 variable "callback_path" {
   description = "Callback path for authorization"
   type        = string
@@ -94,25 +106,38 @@ variable "signed_out_callback_path" {
   default     = "/signout-callback-oidc"
 }
 
-
 # opened bug for lists with optional values https://github.com/hashicorp/terraform/issues/27374
 # this impacts cosmos_containers.max_throughput
 variable "microservices" {
   description = "This will describe your microservices to determine which resources are needed"
   type = list(object({
-    name          = string
-    appservice    = optional(string)
-    function      = optional(string)
-    require_auth  = optional(bool)
-    sql           = optional(string)
-    roles         = optional(list(string))
+    name                        = string
+    appservice                  = optional(string)
+    function                    = optional(string)
+    require_auth                = optional(bool)
+    sql                         = optional(string)
+    roles                       = optional(list(string))
+    application_identifier_uris = optional(list(string))
+    allowed_origins             = optional(list(string))
     application_permissions = optional(list(object({
       resource_app_id = string
       resource_access = list(object({
         id   = string
         type = string
-      })
-    )})))
+        })
+    ) })))
+    scopes = optional(list(object({
+      id          = string
+      type        = string
+      name        = string
+      description = string
+    })))
+    custom_domain = optional(string)
+    tls_certificate = optional(object({
+      source      = string
+      secret_id   = string
+      keyvault_id = string
+    }))
     http = optional(object({
       target    = string
       consumers = list(string)
@@ -127,9 +152,8 @@ variable "microservices" {
       max_throughput     = number
     })))
     static_site = optional(object({
-      index_document                = string
-      error_document                = string
-      domain                        = string
+      index_document = string
+      error_document = string
     }))
   }))
 }
@@ -153,6 +177,12 @@ variable "regions" {
     condition     = length(var.regions) > 0
     error_message = "Must provide at least 1 region to deploy."
   }
+}
+
+variable "use_region_shortcodes" {
+  description = "Use the shortened version of a region name in naming of resources."
+  type        = bool
+  default     = true
 }
 
 variable "azuread_instance" {
