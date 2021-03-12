@@ -556,6 +556,13 @@ resource "azurerm_app_service" "microservice" {
       issuer           = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
     }
   }
+
+  lifecycle {
+    ignore_changes = [
+      # Leave app_settings as-is once created since they can be updated by the service
+      app_settings,
+    ]
+  }
 }
 
 locals {
@@ -609,6 +616,13 @@ resource "azurerm_function_app" "microservice" {
       default_provider = "AzureActiveDirectory"
       issuer           = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
     }
+  }
+
+  lifecycle {
+    ignore_changes = [
+      # Leave app_settings as-is once created since they can be updated by the service
+      app_settings,
+    ]
   }
 
 }
