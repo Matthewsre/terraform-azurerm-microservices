@@ -60,7 +60,7 @@ resource "azurerm_frontdoor" "microservice" {
 
   routing_rule {
     name               = "routing-default"
-    accepted_protocols = ["Https"]
+    accepted_protocols = ["Https", "Http"]
     patterns_to_match  = ["/*"]
     frontend_endpoints = ["frontend-default"]
     forwarding_configuration {
@@ -73,7 +73,7 @@ resource "azurerm_frontdoor" "microservice" {
     for_each = local.has_custom_domain ? [true] : []
     content {
       name               = "routing-custom"
-      accepted_protocols = ["Https"]
+      accepted_protocols = ["Https", "Http"]
       patterns_to_match  = ["/*"]
       frontend_endpoints = ["frontend-custom"]
       forwarding_configuration {
@@ -157,12 +157,8 @@ resource "azurerm_frontdoor" "microservice" {
       host_name                         = var.custom_domain
       custom_https_provisioning_enabled = local.has_tls_certificate
 
-      dynamic "custom_https_configuration" {
-        for_each = local.tls_certificate_source == "FrontDoor" ? [true] : []
-        content {
-          certificate_source = local.tls_certificate_source
-        }
-      }
+      # Note: FrontDoor managed certificates are the default certificate source.  Only need to specify KeyVault if
+      #       you want to manage yourself.
 
       dynamic "custom_https_configuration" {
         for_each = local.tls_certificate_source == "AzureKeyVault" ? [true] : []
