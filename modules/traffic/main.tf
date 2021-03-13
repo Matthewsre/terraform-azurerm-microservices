@@ -9,7 +9,7 @@ locals {
 
   has_custom_domain      = var.custom_domain != null && var.custom_domain != ""
   has_tls_certificate    = var.tls_certificate != null ? var.tls_certificate.source != null : false
-  tls_certificate_source = local.has_tls_certificate ? lower(var.tls_certificate.source) == "frontdoor" ? "FrontDoor" : lower(var.tls_certificate.source) == "keyvault" ? "AzureKeyVault" : "" : ""
+  tls_certificate_source = local.has_tls_certificate ? lower(var.tls_certificate.source) == "keyvault" ? "AzureKeyVault" : "" : ""
 
   has_kevault_secret      = local.tls_certificate_source == "AzureKeyVault"
   keyvault_secret_parts   = local.has_kevault_secret ? split("/", var.tls_certificate.secret_id) : []
@@ -155,7 +155,7 @@ resource "azurerm_frontdoor" "microservice" {
     content {
       name                              = "frontend-custom"
       host_name                         = var.custom_domain
-      custom_https_provisioning_enabled = local.has_tls_certificate
+      custom_https_provisioning_enabled = true
 
       # Note: FrontDoor managed certificates are the default certificate source.  Only need to specify KeyVault if
       #       you want to manage yourself.
