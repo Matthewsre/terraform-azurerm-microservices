@@ -9,7 +9,7 @@ locals {
 
   has_custom_domain      = var.custom_domain != null && var.custom_domain != ""
   has_tls_certificate    = var.tls_certificate != null ? var.tls_certificate.source != null : false
-  tls_certificate_source = local.has_tls_certificate ? lower(var.tls_certificate.source) == "frontdoor" ? "FrontDoor" : lower(var.tls_certificate.source) == "keyvault" ? "AzureKeyVault" : "" : ""
+  tls_certificate_source = local.has_tls_certificate ? lower(var.tls_certificate.source) == "keyvault" ? "AzureKeyVault" : "" : ""
 
   has_kevault_secret      = local.tls_certificate_source == "AzureKeyVault"
   keyvault_secret_parts   = local.has_kevault_secret ? split("/", var.tls_certificate.secret_id) : []
@@ -60,7 +60,7 @@ resource "azurerm_frontdoor" "microservice" {
 
   routing_rule {
     name               = "routing-default"
-    accepted_protocols = ["Https"]
+    accepted_protocols = ["Https", "Http"]
     patterns_to_match  = ["/*"]
     frontend_endpoints = ["frontend-default"]
     forwarding_configuration {
@@ -69,13 +69,42 @@ resource "azurerm_frontdoor" "microservice" {
     }
   }
 
+  dynamic "routing_rule" {
+    for_each = local.has_custom_domain ? [true] : []
+    content {
+      name               = "routing-custom"
+      accepted_protocols = ["Https", "Http"]
+      patterns_to_match  = ["/*"]
+      frontend_endpoints = ["frontend-custom"]
+      forwarding_configuration {
+        forwarding_protocol = "HttpsOnly"
+        backend_pool_name   = "backend-custom"
+      }
+    }
+  }
+
   backend_pool_load_balancing {
     name = "loadbalancing-default"
+  }
+
+  dynamic "backend_pool_load_balancing" {
+    for_each = local.has_custom_domain ? [true] : []
+    content {
+      name = "loadbalancing-custom"
+    }
   }
 
   backend_pool_health_probe {
     name     = "healthprobe-default"
     protocol = "Https"
+  }
+
+  dynamic "backend_pool_health_probe" {
+    for_each = local.has_custom_domain ? [true] : []
+    content {
+      name     = "healthprobe-custom"
+      protocol = "Https"
+    }
   }
 
   backend_pool {
@@ -95,34 +124,52 @@ resource "azurerm_frontdoor" "microservice" {
     health_probe_name   = "healthprobe-default"
   }
 
+  dynamic "backend_pool" {
+    for_each = local.has_custom_domain ? [true] : []
+    content {
+      name = "backend-custom"
+
+      dynamic "backend" {
+        for_each = local.frontdoor_hosts
+        content {
+          host_header = backend.value
+          address     = backend.value
+          http_port   = 80
+          https_port  = 443
+        }
+      }
+
+      load_balancing_name = "loadbalancing-custom"
+      health_probe_name   = "healthprobe-custom"
+    }
+  }
+
   frontend_endpoint {
     name                              = "frontend-default"
-    host_name                         = local.has_custom_domain ? var.custom_domain : "${var.name}.azurefd.net"
+    host_name                         = "${var.name}.azurefd.net"
     custom_https_provisioning_enabled = false
   }
-}
 
-resource "azurerm_frontdoor_custom_https_configuration" "microservice_frontdoor" {
-  count = local.has_frontdoor_resources && local.tls_certificate_source == "FrontDoor" ? 1 : 0
+  dynamic "frontend_endpoint" {
+    for_each = local.has_custom_domain ? [true] : []
+    content {
+      name                              = "frontend-custom"
+      host_name                         = var.custom_domain
+      custom_https_provisioning_enabled = true
 
-  frontend_endpoint_id              = azurerm_frontdoor.microservice[0].frontend_endpoint[0].id
-  custom_https_provisioning_enabled = true
+      # Note: FrontDoor managed certificates are the default certificate source.  Only need to specify KeyVault if
+      #       you want to manage yourself.
 
-  custom_https_configuration {
-    certificate_source = local.tls_certificate_source
+      dynamic "custom_https_configuration" {
+        for_each = local.tls_certificate_source == "AzureKeyVault" ? [true] : []
+        content {
+          certificate_source                         = local.tls_certificate_source
+          azure_key_vault_certificate_secret_name    = local.keyvault_secret_name
+          azure_key_vault_certificate_secret_version = local.keyvault_secret_version
+          azure_key_vault_certificate_vault_id       = local.keyvault_id
+        }
+      }
+    }
   }
 }
 
-resource "azurerm_frontdoor_custom_https_configuration" "microservice_keyvault" {
-  count = local.has_frontdoor_resources && local.tls_certificate_source == "AzureKeyVault" ? 1 : 0
-
-  frontend_endpoint_id              = azurerm_frontdoor.microservice[0].frontend_endpoint[0].id
-  custom_https_provisioning_enabled = true
-
-  custom_https_configuration {
-    certificate_source                         = local.tls_certificate_source
-    azure_key_vault_certificate_secret_name    = local.keyvault_secret_name
-    azure_key_vault_certificate_secret_version = local.keyvault_secret_version
-    azure_key_vault_certificate_vault_id       = local.keyvault_id
-  }
-}
