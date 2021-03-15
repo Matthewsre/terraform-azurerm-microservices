@@ -402,6 +402,7 @@ locals {
     {
       "APPINSIGHTS_INSTRUMENTATIONKEY"             = var.application_insights.instrumentation_key
       "APPLICATIONINSIGHTS_CONNECTION_STRING"      = var.application_insights.connection_string
+      "ASPNETCORE_ENVIRONMENT"                     = "Release"
       "ApplicationInsightsAgent_EXTENSION_VERSION" = "~2"
       "AzureAd:Instance"                           = var.azuread_instance
       "AzureAd:Domain"                             = var.azuread_domain
@@ -550,7 +551,7 @@ resource "azurerm_app_service" "microservice" {
         allowed_audiences = distinct(concat([
           "https://${var.name}-${lookup(local.region_map, each.value.location, each.value.location)}-${var.environment_name}${local.appservices_baseurl}",
           local.microservice_trafficmanager_url
-        ],local.application_identifier_uris))
+        ], local.application_identifier_uris))
       }
       default_provider = "AzureActiveDirectory"
       issuer           = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
@@ -604,7 +605,7 @@ resource "azurerm_function_app" "microservice" {
         allowed_audiences = distinct(concat([
           "https://${var.name}-function-${lookup(local.region_map, each.value.location, each.value.location)}-${var.environment_name}${local.functions_baseurl}",
           local.microservice_trafficmanager_url
-        ],local.application_identifier_uris))
+        ], local.application_identifier_uris))
       }
       default_provider = "AzureActiveDirectory"
       issuer           = "https://sts.windows.net/${var.azurerm_client_config.tenant_id}"
