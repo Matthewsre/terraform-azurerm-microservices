@@ -41,7 +41,7 @@ locals {
 data "azurerm_client_config" "current" {}
 
 data "azuread_user" "current_user" {
-  count     = local.is_dev ? 1 : 0
+  count     = local.is_dev && var.environment_differentiator == "" ? 1 : 0
   object_id = data.azurerm_client_config.current.object_id
 }
 
