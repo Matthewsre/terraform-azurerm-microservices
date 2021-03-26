@@ -523,11 +523,11 @@ resource "azurerm_app_service" "microservice" {
   https_only          = true
 
   site_config {
-    http2_enabled   = true
-    always_on       = true
-    ftps_state      = "FtpsOnly"
-    min_tls_version = "1.2"
-    #dotnet_framework_version = "v5.0"
+    http2_enabled            = true
+    always_on                = true
+    ftps_state               = "FtpsOnly"
+    min_tls_version          = "1.2"
+    dotnet_framework_version = "v5.0"
     #websockets_enabled = true # Will need for Blazor hosted appservice
     cors {
       allowed_origins = local.allowed_origins
@@ -772,7 +772,7 @@ locals {
   function_app_endpoint_resources = local.http_target == "function" ? { for function in azurerm_function_app.microservice : function.location => { id = function.id, location = function.location } } : {}
   azure_endpoint_resources        = merge(local.app_service_endpoint_resources, local.function_app_endpoint_resources)
 
-  static_endpoint_primary_resources   = { for site in azurerm_storage_account.microservice : "${site.name}-primary" => site.primary_web_host } 
-  static_endpoint_secondary_resources = { for site in azurerm_storage_account.microservice : "${site.name}-secondary" => site.secondary_web_host } 
+  static_endpoint_primary_resources   = { for site in azurerm_storage_account.microservice : "${site.name}-primary" => site.primary_web_host }
+  static_endpoint_secondary_resources = { for site in azurerm_storage_account.microservice : "${site.name}-secondary" => site.secondary_web_host }
   static_endpoint_resources           = merge(local.static_endpoint_primary_resources, local.static_endpoint_secondary_resources)
 }
