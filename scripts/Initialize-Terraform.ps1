@@ -67,8 +67,8 @@ $fileName = "${stateFileName}"
 if ([String]::IsNullOrWhiteSpace($stateFileName)) { 
     $differentiator = ""
     if (-not $excludeDifferentiator -and $environment -eq "dev") {
-        $mail = az ad user show --id $objectId --query mail --out tsv
-        $differentiator = $mail.split("#EXT")[0].split("_")[0].split(".")[0].replace("-", "")
+        $mail = az ad user show --id $objectId --query mailNickname --out tsv
+        $differentiator = $mail.split("#EXT#")[0].split("_")[0].split(".")[0].replace("-", "")
     }
 
     $fileName = if ([String]::IsNullOrWhiteSpace($differentiator)) { "${serviceName}-${environment}.tfstate".ToLower() } else { "${serviceName}-${differentiator}-${environment}.tfstate".ToLower() }
