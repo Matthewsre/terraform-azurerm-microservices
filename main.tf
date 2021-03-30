@@ -582,6 +582,11 @@ locals {
   ) : null
 }
 
+# data "external" "service_json_file" {
+#   count = var.create_appsettings ? 1 : 0
+
+#   program = ["Powershell.exe", "-Command", ".'${path.module}/scripts/Write-AppSettings.ps1' '${jsonencode(local.appsettings)}' '${var.appsettings_path}${local.service_name}.machineSettings.json'"]
+# }
 
 resource "null_resource" "service_json_file" {
   count = var.create_appsettings ? 1 : 0
@@ -595,6 +600,12 @@ resource "null_resource" "service_json_file" {
     interpreter = ["PowerShell", "-Command"]
   }
 }
+
+# data "external" "microservice_json_files" {
+#   for_each = var.create_appsettings ? module.microservice : {}
+
+#   program = ["Powershell.exe", "-Command", ".'${path.module}/scripts/Write-AppSettings.ps1' '${jsonencode(each.value.appsettings)}' '${var.appsettings_path}${var.service_name}.${each.value.name}.appSettings.json'"]
+# }
 
 resource "null_resource" "microservice_json_file" {
   for_each = var.create_appsettings ? module.microservice : {}
