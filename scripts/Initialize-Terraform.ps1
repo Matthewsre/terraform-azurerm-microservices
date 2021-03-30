@@ -14,18 +14,17 @@ param(
     [switch] $useMsi,
     [string] $clientId,
     [string] $objectId,
-    [switch] $planOnly)
+    [switch] $planOnly,
+    [switch] $excludeDifferentiator)
 
 $resourceGroupName = if ([String]::IsNullOrWhiteSpace($stateResourceGroupName)) { "${serviceName}-tf-${environment}".ToLower() } else { $stateResourceGroupName }
 $storageAccountName = if ([String]::IsNullOrWhiteSpace($stateStorageAccountName)) { "${serviceName}tf${environment}".ToLower() } else { $stateStorageAccountName }
 $containerName = if ([String]::IsNullOrWhiteSpace($stateStorageContainerName)) { "${serviceName}-${environment}".ToLower() } else { $stateStorageContainerName }
-$fileName = if ([String]::IsNullOrWhiteSpace($stateFileName)) { "${serviceName}-${environment}.tfstate".ToLower() } else { "${stateFileName}" }
 
 Write-Host "Using the following options for State Management:"
 Write-Host "Resource Group Name: $resourceGroupName"
 Write-Host "Storage Account Name: $storageAccountName"
 Write-Host "Storage Container Name: $containerName"
-Write-Host "State File Name: $fileName"
 
 $resourceGroupExists = $(az group exists -n $resourceGroupName) -eq 'true'
 $storageAccountExists = $resourceGroupExists -eq $true -and $(az storage account list --query "[?name=='$storageAccountName'] && [?resourceGroup=='$resourceGroupName']" -o tsv).Length -ne 0
@@ -62,6 +61,20 @@ if (-not $storageAccountExists) {
 # Ensure current user has role to create/manage Storage Container
 $objectId = if ([String]::IsNullOrWhiteSpace($objectId)) { az ad signed-in-user show --query objectId -o tsv } else { $objectId }
 $objectId = if ([String]::IsNullOrWhiteSpace($objectId) -and -not [String]::IsNullOrWhiteSpace($clientId)) { az ad sp list --filter "appId eq '${clientId}'" --query "[].{objectId:objectId}" -o tsv } else { $objectId }
+
+# Get fileName and add differentiator to file name if applicable
+$fileName = "${stateFileName}"
+if ([String]::IsNullOrWhiteSpace($stateFileName)) { 
+    $differentiator = ""
+    if (-not $excludeDifferentiator -and $environment -eq "dev") {
+        $mail = az ad user show --id $objectId --query mail --out tsv
+        $differentiator = $mail.split("#EXT")[0].split("_")[0].split(".")[0].replace("-", "")
+    }
+
+    $fileName = if ([String]::IsNullOrWhiteSpace($differentiator)) { "${serviceName}-${environment}.tfstate".ToLower() } else { "${serviceName}-${differentiator}-${environment}.tfstate".ToLower() }
+}
+
+Write-Host "State File Name: $fileName"
 
 $subscriptionId = if ([String]::IsNullOrWhiteSpace($subscriptionId)) { az account show --query id --output tsv } else { $subscriptionId }
 $tenantId = if ([String]::IsNullOrWhiteSpace($tenantId)) { az account show --query tenantId --output tsv } else { $tenantId }
