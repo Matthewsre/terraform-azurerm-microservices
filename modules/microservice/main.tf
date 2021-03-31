@@ -284,7 +284,7 @@ resource "azurerm_key_vault_certificate" "microservice" {
 }
 
 locals {
-  tls_certificate_secret_id = local.issue_provider_certificate ? azurerm_key_vault_certificate.microservice[0].secret_id : local.has_tls_certificate ? var.tls_certificate.secret_id : ""
+  tls_certificate_secret_id = local.issue_provider_certificate ? azurerm_key_vault_certificate.microservice[0].secret_id : var.tls_certificate != null ? var.tls_certificate.secret_id : ""
   tls_certificate = local.issue_provider_certificate ? {
     source        = local.tls_certificate_source
     secret_id     = local.tls_certificate_secret_id
