@@ -92,7 +92,7 @@ variable "service_name" {
 variable "dev_service_reply_urls" {
   description = "Additional callback paths for authorization to be added for dev environment"
   type        = map(list(string))
-  default = {}
+  default     = {}
 }
 
 variable "callback_path" {
@@ -118,7 +118,6 @@ variable "microservices" {
     sql                         = optional(string)
     roles                       = optional(list(string))
     application_identifier_uris = optional(list(string))
-    allowed_origins             = optional(list(string))
     application_permissions = optional(list(object({
       resource_app_id = string
       resource_access = list(object({
@@ -132,12 +131,6 @@ variable "microservices" {
       name        = string
       description = string
     })))
-    custom_domain = optional(string)
-    tls_certificate = optional(object({
-      source      = string
-      secret_id   = string
-      keyvault_id = string
-    }))
     http = optional(object({
       target    = string
       consumers = list(string)
@@ -325,6 +318,29 @@ variable "sql_elasticpool_per_database_settings" {
 }
 
 ### App Service Variables
+
+variable "service_custom_domains" {
+  description = "Service lookup to specify the custom domain for the service."
+  type        = map(string)
+  default     = {}
+}
+
+variable "service_tls_certificates" {
+  description = "Service lookup to specify the tls certificate for the service."
+  type = map(object({
+    source        = string
+    secret_id     = string
+    keyvault_id   = string
+    provider_name = string
+  }))
+  default = {}
+}
+
+variable "service_allowed_origins" {
+  description = "Service lookup to specify the allowed origins to access the application."
+  type        = map(list(string))
+  default     = {}
+}
 
 variable "appservice_deployment_slots" {
   description = "Additional deployment slots for app services. Standard and above plans allow for deployment slot."

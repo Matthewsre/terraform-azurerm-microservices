@@ -14,6 +14,7 @@ param(
     [switch] $useMsi,
     [string] $clientId,
     [string] $objectId,
+    [string] $developerUPN,
     [switch] $planOnly,
     [switch] $excludeDifferentiator)
 
@@ -132,6 +133,7 @@ if ($planOnly) {
     terraform plan -input=false `
         -var="service_name=${serviceName}" `
         -var="executing_object_id=${objectId}" `
+        -var="key_vault_developer_user_principal_names=[${developerUPN}]" `
         -var-file=".\config\${serviceName}.tfvars" `
         -var-file=".\config\${environment}.tfvars" `
         -out "${fileName}.tfplan"
@@ -142,6 +144,7 @@ else {
         -auto-approve `
         -var="service_name=${serviceName}" `
         -var="executing_object_id=${objectId}" `
+        -var="key_vault_developer_user_principal_names=[${developerUPN}]" `
         -var-file=".\config\${serviceName}.tfvars" `
         -var-file=".\config\${environment}.tfvars"
 }
