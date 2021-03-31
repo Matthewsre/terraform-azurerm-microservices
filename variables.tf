@@ -329,9 +329,9 @@ variable "service_tls_certificates" {
   description = "Service lookup to specify the tls certificate for the service."
   type = map(object({
     source        = string
-    secret_id     = string
-    keyvault_id   = string
-    provider_name = string
+    secret_id     = optional(string)
+    keyvault_id   = optional(string)
+    provider_name = optional(string)
   }))
   default = {}
 }
