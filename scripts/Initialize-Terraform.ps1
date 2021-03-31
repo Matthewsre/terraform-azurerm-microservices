@@ -21,6 +21,7 @@ param(
 $resourceGroupName = if ([String]::IsNullOrWhiteSpace($stateResourceGroupName)) { "${serviceName}-tf-${environment}".ToLower() } else { $stateResourceGroupName }
 $storageAccountName = if ([String]::IsNullOrWhiteSpace($stateStorageAccountName)) { "${serviceName}tf${environment}".ToLower() } else { $stateStorageAccountName }
 $containerName = if ([String]::IsNullOrWhiteSpace($stateStorageContainerName)) { "${serviceName}-${environment}".ToLower() } else { $stateStorageContainerName }
+$developerUPN = if ([String]::IsNullOrWhiteSpace($developerUPN)) { "" } else { '\"' + "${developerUPN}" + '\"' }
 
 Write-Host "Using the following options for State Management:"
 Write-Host "Resource Group Name: $resourceGroupName"
