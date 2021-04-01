@@ -164,6 +164,19 @@ locals {
   key_vault_read_access_ids = local.has_key_vault ? concat([azurerm_user_assigned_identity.microservice_key_vault[0].principal_id], var.key_vault_user_ids) : []
 }
 
+locals {
+  issue_provider_certificate = local.tls_certificate_source == "keyvault" && local.has_certificate_provider && local.has_custom_domain
+}
+
+# If issuing certificate, there is a "magic" account referenced in the documentation that needs to be granted permissions on the KeyVault:
+# Documentation: https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/app_service_certificate#key_vault_secret_id
+
+data "azuread_service_principal" "MicrosoftWebApp" {
+  count = local.issue_provider_certificate ? 1 : 0
+
+  application_id = "abfa0a7c-a6b6-4736-8310-5855508787cd"
+}
+
 ### Key Vault
 resource "azurerm_key_vault" "microservice" {
   count = local.has_key_vault ? 1 : 0
@@ -199,6 +212,18 @@ resource "azurerm_key_vault" "microservice" {
     }
   }
 
+  dynamic "access_policy" {
+    for_each = data.azuread_service_principal.MicrosoftWebApp
+
+    content {
+      tenant_id = var.azurerm_client_config.tenant_id
+      object_id = access_policy.value.id
+
+      certificate_permissions = ["get"]
+      secret_permissions      = ["get"]
+    }
+  }
+
   # access_policy {
   #   tenant_id = var.azurerm_client_config.tenant_id
   #   object_id = var.executing_object_id
@@ -219,10 +244,6 @@ resource "azurerm_key_vault" "microservice" {
       virtual_network_subnet_ids = var.key_vault_network_acls.virtual_network_subnet_ids
     }
   }
-}
-
-locals {
-  issue_provider_certificate = local.tls_certificate_source == "keyvault" && local.has_certificate_provider && local.has_custom_domain
 }
 
 resource "azurerm_key_vault_certificate_issuer" "microservice" {
