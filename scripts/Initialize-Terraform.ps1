@@ -14,12 +14,14 @@ param(
     [switch] $useMsi,
     [string] $clientId,
     [string] $objectId,
+    [string] $developerUPN,
     [switch] $planOnly,
     [switch] $excludeDifferentiator)
 
 $resourceGroupName = if ([String]::IsNullOrWhiteSpace($stateResourceGroupName)) { "${serviceName}-tf-${environment}".ToLower() } else { $stateResourceGroupName }
 $storageAccountName = if ([String]::IsNullOrWhiteSpace($stateStorageAccountName)) { "${serviceName}tf${environment}".ToLower() } else { $stateStorageAccountName }
 $containerName = if ([String]::IsNullOrWhiteSpace($stateStorageContainerName)) { "${serviceName}-${environment}".ToLower() } else { $stateStorageContainerName }
+$developerUPN = if ([String]::IsNullOrWhiteSpace($developerUPN)) { "" } else { '\"' + "${developerUPN}" + '\"' }
 
 Write-Host "Using the following options for State Management:"
 Write-Host "Resource Group Name: $resourceGroupName"
@@ -132,6 +134,7 @@ if ($planOnly) {
     terraform plan -input=false `
         -var="service_name=${serviceName}" `
         -var="executing_object_id=${objectId}" `
+        -var="key_vault_developer_user_principal_names=[${developerUPN}]" `
         -var-file=".\config\${serviceName}.tfvars" `
         -var-file=".\config\${environment}.tfvars" `
         -out "${fileName}.tfplan"
@@ -142,6 +145,7 @@ else {
         -auto-approve `
         -var="service_name=${serviceName}" `
         -var="executing_object_id=${objectId}" `
+        -var="key_vault_developer_user_principal_names=[${developerUPN}]" `
         -var-file=".\config\${serviceName}.tfvars" `
         -var-file=".\config\${environment}.tfvars"
 }

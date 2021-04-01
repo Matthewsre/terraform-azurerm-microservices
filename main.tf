@@ -453,11 +453,11 @@ module "microservice" {
   application_permissions         = each.value.application_permissions
   sql                             = each.value.sql
   roles                           = each.value.roles
-  allowed_origins                 = each.value.allowed_origins
+  allowed_origins                 = lookup(var.service_allowed_origins, each.value.name, [])
   http                            = each.value.http
   scopes                          = each.value.scopes
-  custom_domain                   = each.value.custom_domain
-  tls_certificate                 = each.value.tls_certificate
+  custom_domain                   = lookup(var.service_custom_domains, each.value.name, "")
+  tls_certificate                 = lookup(var.service_tls_certificates, each.value.name, null)
   cosmos_containers               = each.value.cosmos_containers == null ? [] : each.value.cosmos_containers
   queues                          = each.value.queues == null ? [] : each.value.queues
   resource_group_name             = local.resource_group_name

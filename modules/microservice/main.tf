@@ -41,6 +41,7 @@ locals {
   allowed_origins                    = var.allowed_origins != null ? var.allowed_origins : [""]
   has_custom_domain                  = var.custom_domain != null && var.custom_domain != ""
   tls_certificate_source             = var.tls_certificate != null ? var.tls_certificate.source != null ? lower(var.tls_certificate.source) : "" : ""
+  has_certificate_provider           = var.tls_certificate != null ? var.tls_certificate.provider_name != null && var.tls_certificate.provider_name != "" ? true : false : false
   has_application_permissions        = var.application_permissions != null
   application_permissions            = local.has_application_permissions ? var.application_permissions : []
   application_identifier_uris        = var.application_identifier_uris != null ? var.application_identifier_uris : [lower("api://${local.full_microservice_environment_name}")]
@@ -163,6 +164,19 @@ locals {
   key_vault_read_access_ids = local.has_key_vault ? concat([azurerm_user_assigned_identity.microservice_key_vault[0].principal_id], var.key_vault_user_ids) : []
 }
 
+locals {
+  issue_provider_certificate = local.tls_certificate_source == "keyvault" && local.has_certificate_provider && local.has_custom_domain
+}
+
+# If issuing certificate, there is a "magic" account referenced in the documentation that needs to be granted permissions on the KeyVault:
+# Documentation: https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/app_service_certificate#key_vault_secret_id
+
+data "azuread_service_principal" "MicrosoftWebApp" {
+  count = local.issue_provider_certificate ? 1 : 0
+
+  application_id = "abfa0a7c-a6b6-4736-8310-5855508787cd"
+}
+
 ### Key Vault
 resource "azurerm_key_vault" "microservice" {
   count = local.has_key_vault ? 1 : 0
@@ -198,6 +212,18 @@ resource "azurerm_key_vault" "microservice" {
     }
   }
 
+  dynamic "access_policy" {
+    for_each = data.azuread_service_principal.MicrosoftWebApp
+
+    content {
+      tenant_id = var.azurerm_client_config.tenant_id
+      object_id = access_policy.value.id
+
+      certificate_permissions = ["get"]
+      secret_permissions      = ["get"]
+    }
+  }
+
   # access_policy {
   #   tenant_id = var.azurerm_client_config.tenant_id
   #   object_id = var.executing_object_id
@@ -218,6 +244,74 @@ resource "azurerm_key_vault" "microservice" {
       virtual_network_subnet_ids = var.key_vault_network_acls.virtual_network_subnet_ids
     }
   }
+}
+
+resource "azurerm_key_vault_certificate_issuer" "microservice" {
+  count = local.issue_provider_certificate ? 1 : 0
+
+  key_vault_id  = azurerm_key_vault.microservice[0].id
+  name          = var.tls_certificate.provider_name
+  provider_name = var.tls_certificate.provider_name
+}
+
+resource "azurerm_key_vault_certificate" "microservice" {
+  count = local.issue_provider_certificate ? 1 : 0
+
+  name         = "http-ssl-cert"
+  key_vault_id = azurerm_key_vault.microservice[0].id
+
+  certificate_policy {
+    issuer_parameters {
+      name = var.tls_certificate.provider_name
+    }
+
+    key_properties {
+      exportable = true
+      key_size   = 2048
+      key_type   = "RSA"
+      reuse_key  = false
+    }
+
+    lifetime_action {
+      action {
+        action_type = "AutoRenew"
+      }
+
+      trigger {
+        days_before_expiry = 30
+      }
+    }
+
+    secret_properties {
+      content_type = "application/x-pkcs12"
+    }
+
+    x509_certificate_properties {
+      extended_key_usage = ["1.3.6.1.5.5.7.3.1", "1.3.6.1.5.5.7.3.2"]
+
+      key_usage = [
+        "digitalSignature",
+        "keyEncipherment",
+      ]
+
+      subject_alternative_names {
+        dns_names = [var.custom_domain]
+      }
+
+      subject            = "CN=${var.custom_domain}"
+      validity_in_months = 12
+    }
+  }
+}
+
+locals {
+  tls_certificate_secret_id = local.issue_provider_certificate ? azurerm_key_vault_certificate.microservice[0].secret_id : var.tls_certificate != null ? var.tls_certificate.secret_id : ""
+  tls_certificate = local.issue_provider_certificate ? {
+    source        = local.tls_certificate_source
+    secret_id     = local.tls_certificate_secret_id
+    keyvault_id   = azurerm_key_vault.microservice[0].id
+    provider_name = var.tls_certificate.provider_name
+  } : var.tls_certificate
 }
 
 resource "azurerm_key_vault_secret" "cosmos" {
@@ -735,7 +829,7 @@ resource "azurerm_app_service_certificate" "microservice" {
   name                = local.full_microservice_environment_name
   resource_group_name = var.resource_group_name
   location            = var.primary_region
-  key_vault_secret_id = var.tls_certificate.secret_id
+  key_vault_secret_id = local.tls_certificate_secret_id
 }
 
 resource "azurerm_app_service_certificate_binding" "microservice" {

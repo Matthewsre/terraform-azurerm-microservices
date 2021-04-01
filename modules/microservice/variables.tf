@@ -195,9 +195,10 @@ variable "custom_domain" {
 variable "tls_certificate" {
   description = "Source to retrieve an tls/ssl certificate for the service"
   type = object({
-    source      = string
-    secret_id   = optional(string)
-    keyvault_id = optional(string)
+    source        = string
+    secret_id     = optional(string)
+    keyvault_id   = optional(string)
+    provider_name = optional(string)
   })
 }
 
