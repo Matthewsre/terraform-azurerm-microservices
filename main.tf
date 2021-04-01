@@ -73,7 +73,7 @@ locals {
   executing_object_id                      = data.azurerm_client_config.current.object_id != null && data.azurerm_client_config.current.object_id != "" ? data.azurerm_client_config.current.object_id : var.executing_object_id
   environment_name                         = local.is_dev ? "${local.environment_differentiator}-${var.environment}" : var.environment
   service_environment_name                 = local.is_dev ? "${var.service_name}-${local.environment_differentiator}-${var.environment}" : "${var.service_name}-${var.environment}"
-  environment_differentiator               = var.environment_differentiator != "" ? var.environment_differentiator : local.is_dev && length(data.azuread_user.current_user) > 0 ? replace(split(".", split("_", split("#EXT#", data.azuread_user.current_user[0].mail_nickname)[0])[0])[0], "-", "") : ""
+  environment_differentiator               = var.environment_differentiator != "" ? var.environment_differentiator : local.is_dev && length(data.azuread_user.current_user) > 0 ? lower(replace(split(".", split("_", split("#EXT#", data.azuread_user.current_user[0].mail_nickname)[0])[0])[0], "-", "")) : ""
   has_cosmos                               = length({ for microservice in var.microservices : microservice.name => microservice if microservice.cosmos_containers != null ? length(microservice.cosmos_containers) > 0 : false }) > 0
   has_queues                               = length({ for microservice in var.microservices : microservice.name => microservice if microservice.queues != null ? length(microservice.queues) > 0 : false }) > 0
   has_sql_server_elastic                   = length({ for microservice in var.microservices : microservice.name => microservice if microservice.sql == "elastic" }) > 0
