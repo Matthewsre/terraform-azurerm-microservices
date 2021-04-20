@@ -490,6 +490,7 @@ resource "azurerm_cosmosdb_sql_container" "microservice" {
 ### Appservice
 
 locals {
+  azuread_audience  = length(local.application_identifier_uris) > 0 ? local.application_identifier_uris[0] : azuread_application.microservice.application_id
   azuread_authority = "${var.azuread_instance}${var.azurerm_client_config.tenant_id}/v2.0/"
 
   appservice_app_settings = merge(
@@ -502,7 +503,7 @@ locals {
       "AzureAd:Domain"                             = var.azuread_domain
       "AzureAd:TenantId"                           = var.azurerm_client_config.tenant_id
       "AzureAd:ClientId"                           = azuread_application.microservice.application_id
-      "AzureAd:Audience"                           = azuread_application.microservice.application_id
+      "AzureAd:Audience"                           = local.azuread_audience
       "AzureAd:Authority"                          = local.azuread_authority
       "AzureAd:CallbackPath"                       = var.callback_path
       "AzureAd:SignedOutCallbackPath"              = var.signed_out_callback_path
@@ -536,7 +537,7 @@ locals {
         Domain                = var.azuread_domain
         TenantId              = var.azurerm_client_config.tenant_id
         ClientId              = azuread_application.microservice.application_id
-        Audience              = azuread_application.microservice.application_id
+        Audience              = local.azuread_audience
         Authority             = local.azuread_authority
         CallbackPath          = var.callback_path
         SignedOutCallbackPath = var.signed_out_callback_path
