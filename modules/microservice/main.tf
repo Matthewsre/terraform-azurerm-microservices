@@ -336,7 +336,7 @@ resource "azurerm_servicebus_queue" "microservice" {
 resource "azurerm_role_assignment" "microservice_servicebus_receiver" {
   for_each = toset(azurerm_servicebus_queue.microservice)
 
-  scope                = each.id
+  scope                = each.value.id
   role_definition_name = "Azure Service Bus Data Receiver"
   principal_id         = azurerm_user_assigned_identity.microservice_servicebus[0].principal_id
 }
@@ -344,7 +344,7 @@ resource "azurerm_role_assignment" "microservice_servicebus_receiver" {
 resource "azurerm_role_assignment" "microservice_servicebus_sender" {
   for_each = toset(azurerm_servicebus_queue.microservice)
 
-  scope                = each.id
+  scope                = each.value.id
   role_definition_name = "Azure Service Bus Data Sender"
   principal_id         = azurerm_user_assigned_identity.microservice_servicebus[0].principal_id
 }
