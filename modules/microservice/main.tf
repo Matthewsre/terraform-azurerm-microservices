@@ -333,6 +333,22 @@ resource "azurerm_servicebus_queue" "microservice" {
   namespace_name      = each.value.namespace.name
 }
 
+resource "azurerm_role_assignment" "microservice_servicebus_receiver" {
+  for_each = azurerm_servicebus_queue.microservice
+
+  scope                = each.id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = azurerm_user_assigned_identity.microservice_servicebus[0].object_id
+}
+
+resource "azurerm_role_assignment" "microservice_servicebus_sender" {
+  for_each = azurerm_servicebus_queue.microservice
+
+  scope                = each.id
+  role_definition_name = "Azure Service Bus Data Sender"
+  principal_id         = azurerm_user_assigned_identity.microservice_servicebus[0].object_id
+}
+
 ### AAD Application
 
 resource "azuread_application" "microservice" {
@@ -518,6 +534,7 @@ locals {
       "Database:ManagedIdentityClientId" = azurerm_user_assigned_identity.microservice_sql[0].client_id
     } : {},
     local.has_servicebus_queues ? {
+      "ServiceBus:FullyQualifiedNamespace" = "${var.servicebus_namespaces[var.primary_region].name}.servicebus.windows.net"
       "ServiceBus:ConnectionString"        = "Endpoint=sb://${var.servicebus_namespaces[var.primary_region].name}.servicebus.windows.net/;Authentication=Managed Identity"
       "ServiceBus:ManagedIdentityClientId" = azurerm_user_assigned_identity.microservice_servicebus[0].client_id
     } : {},
