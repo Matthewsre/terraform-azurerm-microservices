@@ -338,7 +338,7 @@ resource "azurerm_role_assignment" "microservice_servicebus_receiver" {
 
   scope                = each.id
   role_definition_name = "Azure Service Bus Data Receiver"
-  principal_id         = azurerm_user_assigned_identity.microservice_servicebus[0].object_id
+  principal_id         = azurerm_user_assigned_identity.microservice_servicebus[0].principal_id
 }
 
 resource "azurerm_role_assignment" "microservice_servicebus_sender" {
@@ -346,7 +346,7 @@ resource "azurerm_role_assignment" "microservice_servicebus_sender" {
 
   scope                = each.id
   role_definition_name = "Azure Service Bus Data Sender"
-  principal_id         = azurerm_user_assigned_identity.microservice_servicebus[0].object_id
+  principal_id         = azurerm_user_assigned_identity.microservice_servicebus[0].principal_id
 }
 
 ### AAD Application
