@@ -1,10 +1,10 @@
 terraform {
-  required_version = ">= 0.14"
+  required_version = ">=0.14, <0.15"
   experiments      = [module_variable_optional_attrs]
 
   required_providers {
     azurerm = {
-      version = ">= 2"
+      version = "=2.57.0"
       source  = "hashicorp/azurerm"
     }
   }
@@ -333,6 +333,22 @@ resource "azurerm_servicebus_queue" "microservice" {
   namespace_name      = each.value.namespace.name
 }
 
+resource "azurerm_role_assignment" "microservice_servicebus_receiver" {
+  for_each = toset(azurerm_servicebus_queue.microservice)
+
+  scope                = each.value.id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = azurerm_user_assigned_identity.microservice_servicebus[0].principal_id
+}
+
+resource "azurerm_role_assignment" "microservice_servicebus_sender" {
+  for_each = toset(azurerm_servicebus_queue.microservice)
+
+  scope                = each.value.id
+  role_definition_name = "Azure Service Bus Data Sender"
+  principal_id         = azurerm_user_assigned_identity.microservice_servicebus[0].principal_id
+}
+
 ### AAD Application
 
 resource "azuread_application" "microservice" {
@@ -518,6 +534,7 @@ locals {
       "Database:ManagedIdentityClientId" = azurerm_user_assigned_identity.microservice_sql[0].client_id
     } : {},
     local.has_servicebus_queues ? {
+      "ServiceBus:FullyQualifiedNamespace" = "${var.servicebus_namespaces[var.primary_region].name}.servicebus.windows.net"
       "ServiceBus:ConnectionString"        = "Endpoint=sb://${var.servicebus_namespaces[var.primary_region].name}.servicebus.windows.net/;Authentication=Managed Identity"
       "ServiceBus:ManagedIdentityClientId" = azurerm_user_assigned_identity.microservice_servicebus[0].client_id
     } : {},
@@ -806,7 +823,7 @@ resource "azurerm_function_app_slot" "microservice" {
 locals {
   app_service_names               = [for item in azurerm_app_service.microservice : item.name]
   function_appservice_names       = [for item in azurerm_function_app.microservice : item.name]
-  all_app_service_names           = concat(tolist(local.app_service_names), tolist(local.function_appservice_names))
+  all_app_service_names           = coalescelist(tolist(local.app_service_names), tolist(local.function_appservice_names))
   custom_domain_app_service_names = local.has_custom_domain ? local.all_app_service_names : []
 }
 
