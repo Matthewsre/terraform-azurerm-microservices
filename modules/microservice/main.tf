@@ -823,7 +823,7 @@ resource "azurerm_function_app_slot" "microservice" {
 locals {
   app_service_names               = [for item in azurerm_app_service.microservice : item.name]
   function_appservice_names       = [for item in azurerm_function_app.microservice : item.name]
-  all_app_service_names           = concat(tolist(local.app_service_names), tolist(local.function_appservice_names))
+  all_app_service_names           = coalescelist(tolist(local.app_service_names), tolist(local.function_appservice_names))
   custom_domain_app_service_names = local.has_custom_domain ? local.all_app_service_names : []
 }
 
