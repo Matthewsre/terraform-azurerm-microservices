@@ -829,7 +829,7 @@ locals {
 }
 
 resource "azurerm_app_service_custom_hostname_binding" "microservice" {
-  for_each = toset(local.custom_domain_apps_service_maps)
+  for_each = local.custom_domain_apps_service_maps
 
   hostname            = var.custom_domain
   app_service_name    = each.key
