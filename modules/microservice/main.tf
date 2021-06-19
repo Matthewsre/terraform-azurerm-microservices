@@ -596,7 +596,8 @@ locals {
 locals {
   appservice_function_app_settings = merge(
     {
-      "FUNCTIONS_WORKER_RUNTIME" = "dotnet",
+      "FUNCTIONS_WORKER_RUNTIME"    = "dotnet-isolated",
+      "AZURE_FUNCTIONS_ENVIRONMENT" = "Release",
     },
     local.has_servicebus_queues ? {
       # Currently system assigned identity is supported, but not user assigned identity
@@ -821,14 +822,14 @@ resource "azurerm_function_app_slot" "microservice" {
 }
 
 locals {
-  app_service_names               = [for item in azurerm_app_service.microservice : item.name]
-  function_appservice_names       = [for item in azurerm_function_app.microservice : item.name]
-  all_app_service_names           = coalescelist(tolist(local.app_service_names), tolist(local.function_appservice_names))
-  custom_domain_app_service_names = local.has_custom_domain ? local.all_app_service_names : []
+  app_service_maps = {for item in azurerm_app_service.microservice : item.name => { name = item.name, location = item.location }}
+  function_app_maps = {for item in azurerm_function_app.microservice : item.name => { name = item.name, location = item.location }}
+  all_app_service_maps = length(azurerm_app_service.microservice) > 0 ? local.app_service_maps : local.function_app_maps
+  custom_domain_apps_service_maps = local.has_custom_domain ? local.all_app_service_maps : {}
 }
 
 resource "azurerm_app_service_custom_hostname_binding" "microservice" {
-  for_each = toset(local.custom_domain_app_service_names)
+  for_each = toset(local.custom_domain_apps_service_maps)
 
   hostname            = var.custom_domain
   app_service_name    = each.key
@@ -842,11 +843,11 @@ resource "azurerm_app_service_managed_certificate" "microservice" {
 }
 
 resource "azurerm_app_service_certificate" "microservice" {
-  count = local.tls_certificate_source == "keyvault" ? 1 : 0
+  for_each = local.tls_certificate_source == "keyvault" ? local.custom_domain_apps_service_maps: {}
 
-  name                = local.full_microservice_environment_name
+  name                = each.value.name
   resource_group_name = var.resource_group_name
-  location            = var.primary_region
+  location            = each.value.location
   key_vault_secret_id = local.tls_certificate_secret_id
 }
 
@@ -854,7 +855,7 @@ resource "azurerm_app_service_certificate_binding" "microservice" {
   for_each = local.tls_certificate_source == "keyvault" ? azurerm_app_service_custom_hostname_binding.microservice : {}
 
   hostname_binding_id = each.value.id
-  certificate_id      = azurerm_app_service_certificate.microservice[0].id
+  certificate_id      = azurerm_app_service_certificate.microservice[each.key].id
   ssl_state           = "SniEnabled"
 }
 
