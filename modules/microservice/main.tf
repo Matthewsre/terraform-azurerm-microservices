@@ -421,7 +421,7 @@ resource "null_resource" "azuread_service_principal_owners" {
 
   provisioner "local-exec" {
     command    = "az rest -m POST -u '${local.graph_url}/v1.0/servicePrincipals/${azuread_service_principal.microservice.object_id}/owners/$ref' -b \"{'@odata.id': '${local.graph_url}/v1.0/directoryObjects/${each.key}'}\""
-    on_failure = continue // Ignore already exists errors
+    # on_failure = continue // Ignore already exists errors
   }
 }
 
