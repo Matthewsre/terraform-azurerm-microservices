@@ -385,7 +385,7 @@ resource "azuread_application" "microservice" {
     dynamic "oauth2_permission_scope" {
       for_each = { for item in local.application_scopes : item.id => item }
       content {
-        id                         = random_uuid.permission_scope_id[oauth2_permission_scope.value.id]
+        id                         = random_uuid.permission_scope_id[oauth2_permission_scope.value.id].result
         admin_consent_description  = oauth2_permission_scope.value.description != null && oauth2_permission_scope.value.description != "" ? oauth2_permission_scope.value.description : "Allow the application to access ${local.full_microservice_environment_name} with ${oauth2_permission_scope.value.id} permission"
         admin_consent_display_name = oauth2_permission_scope.value.name != null && oauth2_permission_scope.value.name != "" ? oauth2_permission_scope.value.name : "Access ${local.full_microservice_environment_name} with ${oauth2_permission_scope.value.id} permission"
         user_consent_description   = oauth2_permission_scope.value.description != null && oauth2_permission_scope.value.description != "" ? oauth2_permission_scope.value.description : "Allow the application to access ${local.full_microservice_environment_name} with ${oauth2_permission_scope.value.id} permission"
@@ -400,7 +400,7 @@ resource "azuread_application" "microservice" {
   dynamic "app_role" {
     for_each = toset(local.application_roles)
     content {
-      id                    = random_uuid.app_role_id[app_role.value]
+      id                    = random_uuid.app_role_id[app_role.value].result
       allowed_member_types  = ["Application", "User"]
       description           = "${app_role.value} for service"
       display_name          = app_role.value
