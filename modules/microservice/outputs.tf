@@ -23,7 +23,7 @@ output "application_data" {
   description = "AAD Application Data to use for role assignments"
   value = {
     application       = azuread_application.microservice
-    application_roles = azuread_application_app_role.microservice
+    application_roles = random_uuid.app_role_id
     service_consumers = local.consumers
   }
 }

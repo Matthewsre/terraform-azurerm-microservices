@@ -351,24 +351,61 @@ resource "azurerm_role_assignment" "microservice_servicebus_sender" {
 
 ### AAD Application
 
+# Combining the default InternalService role with additional roles
+locals {
+  application_roles = concat(["InternalService"], coalesce(var.roles, []))
+}
+
+resource "random_uuid" "app_role_id" {
+  for_each = toset(local.application_roles)
+}
+
+resource "random_uuid" "permission_scope_id" {
+  for_each = { for item in local.application_scopes : item.id => item.id }
+}
+
 resource "azuread_application" "microservice" {
   display_name               = local.full_microservice_environment_name
   prevent_duplicate_names    = true
-  oauth2_allow_implicit_flow = true
   identifier_uris            = local.application_identifier_uris
   owners                     = var.application_owners
-  group_membership_claims    = "None"
+  group_membership_claims    = ["None"]
 
-  dynamic "oauth2_permissions" {
-    for_each = { for item in local.application_scopes : item.id => item }
+  web {
+
+    redirect_uris = local.application_callback_urls
+
+    implicit_grant {
+      access_token_issuance_enabled = true
+      id_token_issuance_enabled     = true
+    }
+  }
+
+  api {
+    dynamic "oauth2_permission_scope" {
+      for_each = { for item in local.application_scopes : item.id => item }
+      content {
+        id                         = random_uuid.permission_scope_id[oauth2_permission_scope.value.id]
+        admin_consent_description  = oauth2_permission_scope.value.description != null && oauth2_permission_scope.value.description != "" ? oauth2_permission_scope.value.description : "Allow the application to access ${local.full_microservice_environment_name} with ${oauth2_permission_scope.value.id} permission"
+        admin_consent_display_name = oauth2_permission_scope.value.name != null && oauth2_permission_scope.value.name != "" ? oauth2_permission_scope.value.name : "Access ${local.full_microservice_environment_name} with ${oauth2_permission_scope.value.id} permission"
+        user_consent_description   = oauth2_permission_scope.value.description != null && oauth2_permission_scope.value.description != "" ? oauth2_permission_scope.value.description : "Allow the application to access ${local.full_microservice_environment_name} with ${oauth2_permission_scope.value.id} permission"
+        user_consent_display_name  = oauth2_permission_scope.value.name != null && oauth2_permission_scope.value.name != "" ? oauth2_permission_scope.value.name : "Access ${local.full_microservice_environment_name} with ${oauth2_permission_scope.value.id} permission"
+        enabled                    = true
+        type                       = oauth2_permission_scope.value.type != null && oauth2_permission_scope.value.type != "" ? oauth2_permission_scope.value.type : "Admin"
+        value                      = oauth2_permission_scope.value.id
+      }
+    }
+  }
+
+  dynamic "app_role" {
+    for_each = toset(local.application_roles)
     content {
-      admin_consent_description  = oauth2_permissions.value.description != null && oauth2_permissions.value.description != "" ? oauth2_permissions.value.description : "Allow the application to access ${local.full_microservice_environment_name} with ${oauth2_permissions.value.id} permission"
-      admin_consent_display_name = oauth2_permissions.value.name != null && oauth2_permissions.value.name != "" ? oauth2_permissions.value.name : "Access ${local.full_microservice_environment_name} with ${oauth2_permissions.value.id} permission"
-      user_consent_description   = oauth2_permissions.value.description != null && oauth2_permissions.value.description != "" ? oauth2_permissions.value.description : "Allow the application to access ${local.full_microservice_environment_name} with ${oauth2_permissions.value.id} permission"
-      user_consent_display_name  = oauth2_permissions.value.name != null && oauth2_permissions.value.name != "" ? oauth2_permissions.value.name : "Access ${local.full_microservice_environment_name} with ${oauth2_permissions.value.id} permission"
-      is_enabled                 = true
-      type                       = oauth2_permissions.value.type != null && oauth2_permissions.value.type != "" ? oauth2_permissions.value.type : "Admin"
-      value                      = oauth2_permissions.value.id
+      id                    = random_uuid.app_role_id[app_role.value]
+      allowed_member_types  = ["Application", "User"]
+      description           = "${app_role.value} for service"
+      display_name          = app_role.value
+      enabled               = true
+      value                 = app_role.value
     }
   }
 
@@ -401,8 +438,6 @@ resource "azuread_application" "microservice" {
       }
     }
   }
-
-  reply_urls = local.application_callback_urls
 }
 
 # Creating service principal for application
@@ -428,22 +463,6 @@ resource "null_resource" "azuread_service_principal_owners" {
     interpreter = ["PowerShell", "-Command"]
     on_failure = continue // Ignore already exists errors
   }
-}
-
-# Combining the default InternalService role with additional roles
-locals {
-  application_roles = concat(["InternalService"], coalesce(var.roles, []))
-}
-
-resource "azuread_application_app_role" "microservice" {
-  for_each = toset(local.application_roles)
-
-  application_object_id = azuread_application.microservice.id
-  allowed_member_types  = ["Application", "User"]
-  description           = "${each.value} for service"
-  display_name          = each.value
-  is_enabled            = true
-  value                 = each.value
 }
 
 ### SQL Database

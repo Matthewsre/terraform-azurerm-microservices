@@ -7,6 +7,10 @@ terraform {
       version = "=2.57.0"
       source  = "hashicorp/azurerm"
     }
+    azuread = {
+      version = ">= 2.0.1"
+      source  = "hashicorp/azuread"
+    }
   }
 }
 
@@ -342,6 +346,7 @@ resource "azurerm_key_vault_secret" "sql_admin_password" {
 resource "azuread_group" "sql_admin" {
   count        = local.has_sql_server && !local.has_sql_admin ? 1 : 0
   display_name = "${local.admin_login}-sql"
+  security_enabled = true
 }
 locals {
   sql_azuread_administrator = length(azuread_group.sql_admin) == 0 ? var.sql_azuread_administrator : azuread_group.sql_admin[0].id
